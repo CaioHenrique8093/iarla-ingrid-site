@@ -1,0 +1,18 @@
+IARLA INGRID PADARIA E DOCERIA · site + painel
+================================================
+Site:   https://iarlaingridpadaria.com.br
+Painel: https://iarlaingridpadaria.com.br/admin/
+
+ÚNICA COISA A PREENCHER: arquivo config.js
+  key: "COLE_AQUI_A_PUBLISHABLE_KEY"
+  -> troque pelo valor da "Publishable key" (sb_publishable_...)
+     Supabase > Project Settings > API Keys.
+  NUNCA coloque a "Secret key" nem a "service_role".
+
+Estrutura
+  index.html          site (cardápio + pedido pelo WhatsApp)
+  admin/index.html    painel da loja (login da Iarla)
+  config.js           endereço e chave pública do banco
+  img/                fotos iniciais e logos
+  .github/workflows/  acesso diário automático (evita pausa do Supabase grátis)
+  _headers, robots.txt  segurança e ocultar o painel do Google

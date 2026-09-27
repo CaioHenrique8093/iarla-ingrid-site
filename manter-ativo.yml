@@ -1,0 +1,17 @@
+# Acessa o banco 1x por dia para o Supabase (plano grátis) não pausar o projeto.
+name: Manter banco ativo
+on:
+  schedule:
+    - cron: "17 12 * * *"   # todo dia às 09:17 (horário de Sobral)
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Acessar o banco
+        run: |
+          URL=$(grep -oP 'url:\s*"\K[^"]+' config.js)
+          KEY=$(grep -oP 'key:\s*"\K[^"]+' config.js)
+          curl -fsS "$URL/rest/v1/configuracoes?select=id" -H "apikey: $KEY" > /dev/null
+          echo "Banco ativo"
