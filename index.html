@@ -321,7 +321,6 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .send[aria-disabled="true"]{opacity:.55}
 .formerr{display:none;font-size:14px;color:#B3261E;font-weight:600;text-align:center}
 .formerr.on{display:block}
-.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
 .preview summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--brown);min-height:40px;display:flex;align-items:center}
 .preview pre{margin:8px 0 0;padding:14px;border-radius:14px;background:#E7F6EC;color:#10301E;font:14px/1.5 var(--sans);white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto}
@@ -611,7 +610,6 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
               <textarea id="obs" name="obs" placeholder="Ex.: escrever “Feliz aniversário, Maria” na torta"></textarea>
             </div>
 
-            <div class="hp" aria-hidden="true"><label for="empresa">Empresa</label><input id="empresa" name="empresa" tabindex="-1" autocomplete="off"></div>
             <p class="formerr" id="formErr" role="alert"></p>
             <button class="btn btn-primary send" id="sendBtn" type="button">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
@@ -1042,7 +1040,6 @@ let sending = false;
 $("sendBtn").addEventListener("click", async ()=>{
   if(sending || !validate()) return;
   $("fallbackBtn").hidden = true;
-  if($("empresa").value){ finish(null); return; } // robô
   if(!ONLINE){ finishWhatsApp(buildMessage()); return; }
   sending = true; $("sendBtn").disabled = true; $("sendLbl").textContent = "Enviando pedido…";
   try{
