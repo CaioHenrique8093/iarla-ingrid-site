@@ -328,6 +328,27 @@ select.in{background-image:linear-gradient(45deg,transparent 50%,currentColor 50
 .err-inline{color:var(--bad);font-size:14px;font-weight:600;margin:0;text-align:center}
 .login-card .btn[disabled]{opacity:.6}
 .refreshing{opacity:.6;pointer-events:none}
+
+/* alerta de pedido novo */
+.alertbar{position:fixed;top:0;left:0;right:0;z-index:80;display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));background:#C2410C;color:#fff;font-weight:700;font-size:16px;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);animation:pulse 1.2s ease-in-out infinite}
+.alertbar .i{width:26px;height:26px;flex:none}
+.alertbar span{flex:1;min-width:0}
+.alertbar button{border:0;background:#fff;color:#7C2D12;font-weight:800;font-size:15px;padding:10px 16px;border-radius:12px;cursor:pointer;white-space:nowrap}
+body.has-alert .shell{padding-top:var(--alert-h,64px)}
+body.has-alert .topbar{top:var(--alert-h,64px)}
+@media (min-width:900px){body.has-alert .side{top:var(--alert-h,64px);height:calc(100vh - var(--alert-h,64px))}}
+body.has-alert .sheet{margin-top:var(--alert-h,64px)}
+.alertbar.sound{background:var(--brown);color:var(--on-brown);animation:none}
+.alertbar.sound button{color:var(--brown)}
+@keyframes pulse{50%{background:#9A3412}}
+/* impressora */
+.printbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);font-size:14.5px}
+.printbar .dot{width:10px;height:10px;border-radius:50%;background:#9CA3AF;flex:none}
+.printbar .dot.on{background:#16A34A}.printbar .dot.off{background:#DC2626}
+.printbar .txt{flex:1;min-width:180px}
+.printbar .txt b{display:block}
+.wamsgs{display:grid;gap:8px}
+.wamsgs .btn{justify-content:flex-start}
 </style>
 </head>
 <body>
@@ -376,10 +397,12 @@ select.in{background-image:linear-gradient(45deg,transparent 50%,currentColor 50
 
 <div id="sheetRoot"></div>
 <div id="toastRoot" aria-live="polite"></div>
+<div id="alertRoot" role="alert"></div>
 <input type="file" id="filePick" accept="image/*" hidden>
 
 <script src="../config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.6/qz-tray.js"></script>
 <script>
 /* =====================================================================
    Painel Iarla Ingrid · ligado ao Supabase
@@ -435,7 +458,7 @@ const prodFrom = r => ({id:r.id, cat:r.categoria_id, name:r.nome, img:r.foto_url
 const prodTo = p => ({categoria_id:p.cat, nome:p.name, descricao:p.desc||"", foto_url:p.img||"", foto_pos:p.pos||"50% 50%", porcao:p.serve||"",
   preco:+p.price||0, sabores:p.flavors||[], sabor_a_combinar:!!p.askFlavor, tamanhos:(p.sizes||[]).map(([q,pr])=>({qtd:q,preco:pr})), itens_combo:p.items||[],
   destaque:!!p.featured, ativo:!!p.active, esgotado:!!p.soldOut, estoque_ativo:!!p.stockOn, estoque:+p.stock||0, ordem:p.ordem||0, atualizado_em:new Date().toISOString()});
-const orderFrom = r => ({id:r.id, num:r.numero, created:r.criado_em, name:r.cliente_nome, phone:r.cliente_whatsapp, mode:r.modo, bairro:r.bairro||"", address:r.endereco||"",
+const orderFrom = r => ({id:r.id, num:r.numero, printed:r.impresso_em||(typeof printedHere!=="undefined"&&printedHere.has(r.id)?new Date().toISOString():null), created:r.criado_em, name:r.cliente_nome, phone:r.cliente_whatsapp, mode:r.modo, bairro:r.bairro||"", address:r.endereco||"",
   ref:r.referencia||"", fee:r.taxa==null?null:+r.taxa, date:r.data_desejada, time:r.horario||"", pay:r.pagamento, troco:r.troco||"", obs:r.observacoes||"",
   status:r.status, total:+r.total, sub:+r.subtotal, items:(r.pedido_itens||[]).map(i=>({pid:i.produto_id,label:i.nome,detail:i.detalhe,qty:i.qtd,price:+i.preco_unit}))});
 function storeFrom(c, f){
@@ -463,14 +486,13 @@ async function loadOrders(){
   if(error) throw error;
   DB.orders = data.map(orderFrom);
   const novos = DB.orders.filter(o=>o.status==="novo").map(o=>o.id);
-  if(lastNewIds){ const fresh = DB.orders.filter(o=>o.status==="novo" && !lastNewIds.includes(o.id)); if(fresh.length){ toast(fresh.length===1?`Novo pedido #${fresh[0].num} de ${fresh[0].name}`:`${fresh.length} pedidos novos`); beep(); } }
+  if(lastNewIds){ const fresh = DB.orders.filter(o=>o.status==="novo" && !lastNewIds.includes(o.id)); if(fresh.length){ toast(fresh.length===1?`Novo pedido #${fresh[0].num} de ${fresh[0].name}`:`${fresh.length} pedidos novos`); } }
   lastNewIds = novos;
+  afterOrders();
   document.title = (novos.length?`(${novos.length}) `:"") + "Painel · Iarla Ingrid";
 }
 async function loadAll(){ await Promise.all([loadCatalog(), loadStore(), loadOrders()]); }
 
-let audioCtx;
-function beep(){ try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.frequency.value=880; g.gain.value=.08; o.connect(g); g.connect(audioCtx.destination); o.start(); setTimeout(()=>{o.frequency.value=1175;},140); setTimeout(()=>o.stop(),300); }catch(e){} }
 
 /* ================= toast + sheet ================= */
 let toastT;
@@ -586,19 +608,20 @@ function renderOrders(){
   $("#page").innerHTML = `
     <div class="filters" role="tablist">${["novo","confirmado","entregue","cancelado","todos"].map(f=>`<button class="chip${f===ordFilter?" on":""}" type="button" data-f="${f}">${f==="todos"?"Todos":STATUS[f]} <b>${counts[f]}</b></button>`).join("")}</div>
     ${list.length?`<div class="orders">${list.map(orderCard).join("")}</div>`:`<div class="card empty-state">Nenhum pedido ${ordFilter==="todos"?"":STATUS[ordFilter].toLowerCase()} por aqui.</div>`}
-    <p class="muted small" style="margin:0">Os pedidos chegam aqui quando o cliente toca em “Enviar pedido” no site. A lista se atualiza sozinha a cada 30 segundos.</p>`;
+    ${printBarHTML()}
+    <p class="muted small" style="margin:0">Os pedidos chegam aqui na hora em que o cliente confirma no site. Deixe esta tela aberta para ouvir o alerta.</p>`;
   $$("[data-f]").forEach(b=>b.onclick=()=>{ ordFilter=b.dataset.f; renderOrders(); });
-  bindOrderCards();
+  bindOrderCards(); bindPrintBar();
 }
 async function setStatus(id, st){
-  const o = DB.orders.find(o=>o.id===id), before = o.status;
+  const o = DB.orders.find(o=>o.id===id), before = o.status; ackOrder(id);
   try{ await q(SB.from("pedidos").update({status:st}).eq("id",id), "atualizar o pedido"); }catch(e){ return; }
   closeSheet(); await Promise.all([loadOrders(), loadCatalog()]).catch(()=>{}); render();
   const msg = {confirmado:"Pedido confirmado",entregue:"Pedido marcado como entregue",cancelado:"Pedido cancelado · estoque devolvido",novo:"Pedido reaberto"}[st];
   toast(msg, async ()=>{ try{ await q(SB.from("pedidos").update({status:before}).eq("id",id),"desfazer"); await Promise.all([loadOrders(), loadCatalog()]); render(); toast("Desfeito"); }catch(e){} });
 }
 function openOrder(id){
-  const o = DB.orders.find(o=>o.id===id);
+  const o = DB.orders.find(o=>o.id===id); ackOrder(id);
   const d = String(o.phone).replace(/\D/g,""); const waNum = d.length<=11 ? "55"+d : d;
   const actions = {
     novo:`<button class="btn btn-bad" type="button" data-st="cancelado">Cancelar</button><button class="btn btn-primary" type="button" data-st="confirmado">${ic("check")}Confirmar</button>`,
@@ -619,8 +642,11 @@ function openOrder(id){
       <dt>Pagamento</dt><dd>${esc(o.pay)}${o.troco?` · troco para ${esc(o.troco)}`:""}</dd>
       ${o.obs?`<dt>Obs.</dt><dd>${esc(o.obs)}</dd>`:""}
     </dl>
-    <a class="btn btn-ghost btn-block" href="https://wa.me/${waNum}" target="_blank" rel="noopener">${ic("wa")}Chamar ${esc(o.name.split(" ")[0])} no WhatsApp</a>`,
-    foot:actions, onMount:s=>$$("[data-st]",s).forEach(b=>b.onclick=()=>busy(b,()=>setStatus(o.id,b.dataset.st)))});
+    <div class="wamsgs">${waButtons(o, waNum)}</div>
+    <button class="btn btn-ghost btn-block" type="button" id="printOne">${ic("print")}${o.printed?"Imprimir a comanda de novo":"Imprimir comanda"}</button>
+    <p class="muted small" style="margin:0;text-align:center">${o.printed?`Comanda impressa ${fmtWhen(o.printed).toLowerCase()}.`:"Comanda ainda não impressa."}</p>`,
+    foot:actions, onMount:s=>{ $$("[data-st]",s).forEach(b=>b.onclick=()=>busy(b,()=>setStatus(o.id,b.dataset.st)));
+      $("#printOne",s).onclick=e=>busy(e.currentTarget, async()=>{ await printOrder(o, {manual:true}); }); }});
 }
 
 /* ================= CARDÁPIO ================= */
@@ -1041,6 +1067,315 @@ function renderStore(){
   });
 }
 
+
+/* =====================================================================
+   ALERTA DE PEDIDO NOVO + TEMPO REAL + IMPRESSÃO (QZ Tray)
+   ===================================================================== */
+ICONS.print = '<path d="M7 9V4h10v5"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v6H7z"/>';
+ICONS.bell = '<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2z"/><path d="M10 20a2 2 0 0 0 4 0"/>';
+
+/* ---------- aparelho: preferências guardadas só neste computador ---------- */
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const PRN = {
+  get auto(){ return LS.get("ii-print-auto", false); }, set auto(v){ LS.set("ii-print-auto", !!v); },
+  get name(){ return LS.get("ii-printer", ""); }, set name(v){ LS.set("ii-printer", v||""); }
+};
+
+/* ---------- som ---------- */
+let audioCtx, soundOK = false;
+function unlockSound(){
+  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==="suspended") audioCtx.resume(); soundOK = audioCtx.state!=="suspended"; }catch(e){ soundOK = false; }
+  return soundOK;
+}
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended"){ audioCtx.resume(); }
+    const t0 = audioCtx.currentTime;
+    [[880,0],[1175,.16],[1568,.32]].forEach(([f,dt])=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.0001,t0+dt); g.gain.exponentialRampToValueAtTime(0.35,t0+dt+.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+dt+.28);
+      o.start(t0+dt); o.stop(t0+dt+.3);
+    });
+  }catch(e){}
+}
+["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev, ()=>{ if(!soundOK){ unlockSound(); renderAlert(); } }, {passive:true}));
+
+/* ---------- pedidos já vistos neste aparelho (param o alerta) ---------- */
+let acked = new Set(LS.get("ii-acked", []));
+function ackOrder(id){ if(!acked.has(id)){ acked.add(id); LS.set("ii-acked", [...acked].slice(-500)); } renderAlert(); }
+function pendingAlerts(){
+  const limite = Date.now() - 12*3600*1000;
+  return DB.orders.filter(o=>o.status==="novo" && !acked.has(o.id) && new Date(o.created).getTime() > limite);
+}
+let alarmTimer = null;
+function renderAlert(){
+  const root = $("#alertRoot"); if(!root) return;
+  if($("#app").hidden){ root.innerHTML = ""; stopAlarm(); document.body.classList.remove("has-alert"); return; }
+  const pend = pendingAlerts();
+  document.body.classList.toggle("has-alert", true);
+  if(pend.length){
+    const o = pend[pend.length-1];
+    root.innerHTML = `<div class="alertbar">${ic("bell")}<span>${pend.length===1?`Novo pedido #${o.num} · ${esc(o.name)}`:`${pend.length} pedidos novos`}${soundOK?"":" · toque para ativar o som"}</span><button type="button" id="alertSee">Ver pedido</button></div>`;
+    $("#alertSee").onclick = ()=>{ unlockSound(); if(pend.length===1){ openOrder(o.id); } else { pend.forEach(x=>ackOrder(x.id)); ordFilter="novo"; go("pedidos"); } };
+    startAlarm();
+  } else {
+    stopAlarm();
+    document.body.classList.toggle("has-alert", !soundOK);
+    root.innerHTML = soundOK ? "" : `<div class="alertbar sound">${ic("bell")}<span>Toque aqui para ativar o som dos pedidos novos</span><button type="button" id="soundOn">Ativar som</button></div>`;
+    const b = $("#soundOn"); if(b) b.onclick = ()=>{ unlockSound(); beep(); renderAlert(); };
+  }
+  fitAlert();
+}
+function fitAlert(){ const bar=$("#alertRoot .alertbar"); document.documentElement.style.setProperty("--alert-h", (bar?bar.offsetHeight:0)+"px"); }
+window.addEventListener("resize", fitAlert);
+function startAlarm(){ if(alarmTimer) return; beep(); alarmTimer = setInterval(()=>{ if(pendingAlerts().length) beep(); else stopAlarm(); }, 4000); }
+function stopAlarm(){ clearInterval(alarmTimer); alarmTimer = null; }
+
+/* ---------- tempo real: pedido novo chega na hora ---------- */
+let rtChannel = null, rtTimer = null;
+function startRealtime(){
+  try{
+    if(rtChannel) SB.removeChannel(rtChannel);
+    rtChannel = SB.channel("pedidos-painel")
+      .on("postgres_changes", {event:"*", schema:"public", table:"pedidos"}, ()=>{ clearTimeout(rtTimer); rtTimer = setTimeout(refreshOrders, 700); })
+      .subscribe();
+  }catch(e){ console.warn("tempo real indisponível", e); }
+}
+async function refreshOrders(){
+  try{ await loadOrders(); if(view==="pedidos"||view==="inicio") render(); else renderNav(); }catch(e){}
+}
+function stopRealtime(){ try{ if(rtChannel) SB.removeChannel(rtChannel); }catch(e){} rtChannel = null; }
+
+/* chamado sempre que a lista de pedidos é recarregada */
+function afterOrders(){ renderAlert(); autoPrint(); }
+
+/* ---------- comanda (80 mm) ---------- */
+const COMANDA_CSS = "font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;width:270px;padding:8px 6px 18px;margin:0;box-sizing:border-box;font-size:13px;line-height:1.3;font-weight:700";
+function comandaHTML(o){
+  const hr = '<div style="border-top:2px dashed #000;margin:7px 0"></div>';
+  const row = (a,b,big) => `<table style="width:100%;border-collapse:collapse;font-size:${big?"17px":"13px"};font-weight:${big?900:700}"><tr><td style="padding:1px 0;vertical-align:top">${a}</td><td style="padding:1px 0 1px 6px;text-align:right;white-space:nowrap;vertical-align:top">${b}</td></tr></table>`;
+  const quando = new Date(o.created).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+  const itens = o.items.map(i=>`<div style="margin:3px 0">${row(`<span style="font-size:15px;font-weight:900">${i.qty}x ${esc(i.label)}</span>${i.detail?`<div style="font-weight:700;font-size:13px;padding-left:10px">${esc(i.detail)}</div>`:""}`, brl(i.qty*i.price))}</div>`).join("");
+  const ent = o.mode==="entrega";
+  return `<div style="${COMANDA_CSS}">
+    <div style="text-align:center;font-size:18px;font-weight:900">IARLA INGRID</div>
+    <div style="text-align:center;font-size:12px">Padaria e Doceria</div>
+    ${hr}
+    <div style="text-align:center;font-size:28px;font-weight:900;line-height:1.1">PEDIDO #${o.num}</div>
+    <div style="text-align:center;font-size:12px">Recebido em ${quando}</div>
+    ${hr}
+    <div style="text-align:center;font-size:20px;font-weight:900;border:2px solid #000;padding:4px 0">${ent?"ENTREGA":"RETIRADA NA LOJA"}</div>
+    <div style="text-align:center;font-size:16px;font-weight:900;margin-top:5px">Para: ${esc(fmtDate(o.date))}${o.time?` às ${esc(o.time)}`:""}</div>
+    ${hr}
+    ${itens}
+    ${hr}
+    ${row("Subtotal", brl(o.sub))}
+    ${ent?row(`Entrega${o.bairro?` (${esc(o.bairro)})`:""}`, o.fee==null?"a combinar":brl(o.fee)):""}
+    ${row("TOTAL", brl(o.total)+(ent&&o.fee==null?" + taxa":""), true)}
+    ${hr}
+    <div style="font-size:15px;font-weight:900">${esc(o.name)}</div>
+    <div>WhatsApp: ${esc(fmtPhone(o.phone))}</div>
+    ${ent?`<div style="margin-top:4px">${esc(o.address)}${o.bairro?` – ${esc(o.bairro)}`:""}</div>${o.ref?`<div>Ref.: ${esc(o.ref)}</div>`:""}`:""}
+    <div style="margin-top:4px">Pagamento: ${esc(o.pay)}${o.troco?` · troco para ${esc(o.troco)}`:""}</div>
+    ${o.obs?`${hr}<div style="font-size:14px">OBS: ${esc(o.obs)}</div>`:""}
+    ${hr}
+    <div style="text-align:center;font-size:11px;font-weight:700">iarlaingridpadaria.com.br</div>
+  </div>`;
+}
+
+/* ---------- QZ Tray ---------- */
+const QZ_CERT = `-----BEGIN CERTIFICATE-----
+MIID0TCCArmgAwIBAgIUHlasEFWXa2N0gatLQX93wZViXzswDQYJKoZIhvcNAQEL
+BQAweDELMAkGA1UEBhMCQlIxCzAJBgNVBAgMAkNFMQ8wDQYDVQQHDAZTb2JyYWwx
+JzAlBgNVBAoMHklhcmxhIEluZ3JpZCBQYWRhcmlhIGUgRG9jZXJpYTEiMCAGA1UE
+AwwZaWFybGFpbmdyaWRwYWRhcmlhLmNvbS5icjAeFw0yNjA5MjkyMjMxMjlaFw00
+NjA5MjQyMjMxMjlaMHgxCzAJBgNVBAYTAkJSMQswCQYDVQQIDAJDRTEPMA0GA1UE
+BwwGU29icmFsMScwJQYDVQQKDB5JYXJsYSBJbmdyaWQgUGFkYXJpYSBlIERvY2Vy
+aWExIjAgBgNVBAMMGWlhcmxhaW5ncmlkcGFkYXJpYS5jb20uYnIwggEiMA0GCSqG
+SIb3DQEBAQUAA4IBDwAwggEKAoIBAQCtLDFLVtBBqfAUqDumpR78+fpa9wCoCV49
+KGZzeY4QuftP+3SDKzA5TwfdBNTKHJ4dXhyhDhQAuLlU7RdN98WIqku5bQ4OG1gS
+JnpzSQ1ydjdMsCadpHlg8jbKECmPGeaMGx6SQJi73Cw6v6jtB6kQ8YoATnhKItuz
+gzC48kC7xFg5Rn1BWCylEVlcL1VAGierDb+ZrMYuoONNoyt/m6dJ56SQwAjGS3UY
+FRNg+fSprD1l1ttlbS9No95wSlPjAYxqQVu1Sw7Az/TbMvccaYclnVRwjw6IH16s
+GqnixaOQE/onUwOIRQvi/rmqZATBqG38eoYcpoYgfME4ci79PXJfAgMBAAGjUzBR
+MB0GA1UdDgQWBBRyZy0n3XaHRXDUBNQgXpaaQJwyvzAfBgNVHSMEGDAWgBRyZy0n
+3XaHRXDUBNQgXpaaQJwyvzAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUA
+A4IBAQCcfba9zkuePsqqArdegArug3Bfda5F68tcSQvQMaVrDuLm2+dtS9aWWIdr
+qE//4nQh09m9Ck+xwHyzQzph0y163Ng+SEhJgs/6x6Y220neJru2E+kBQEm0p8Xs
+Z/cwiOhrcMb09bg3E2HE0oDJ0JDTj/5vLfyiV4B+zh63b5kv67VMYMqvUiEy2Q+I
+srM6+4c6deScQ13A83xEemWvTRKr+s8lvjPU5GhJH0iA9qDR7DhItdnS+glKm3AX
+3x1cVji5s48UqPe3ICYbYPj4fxIR0RjmL6y//eB5FmsOYtTsKSg+F96fo7mh0nkN
+B71Mk2QwSws6cD62XbkVwhQmjxej
+-----END CERTIFICATE-----`;
+let qzState = "off", qzReconnect = null, qzPrinters = [];
+function qzAvailable(){ return !!(window.qz && qz.websocket); }
+let qzConfigured = false;
+function qzSetup(){
+  if(qzConfigured || !qzAvailable()) return;
+  qz.security.setCertificatePromise(resolve=>resolve(QZ_CERT));
+  if(qz.security.setSignatureAlgorithm) qz.security.setSignatureAlgorithm("SHA512");
+  qz.security.setSignaturePromise(toSign => (resolve, reject) => {
+    SB.functions.invoke("qz-sign", { body:{ request: toSign } })
+      .then(({data, error}) => error ? reject(error) : resolve(typeof data==="string" ? data : (data && data.signature) || ""))
+      .catch(reject);
+  });
+  qz.websocket.setClosedCallbacks(()=>{ qzState = "off"; updatePrintBar(); });
+  qzConfigured = true;
+}
+async function qzConnect(){
+  if(!qzAvailable()){ qzState = "nolib"; updatePrintBar(); return false; }
+  qzSetup();
+  if(qz.websocket.isActive()){ qzState = "on"; return true; }
+  qzState = "connecting"; updatePrintBar();
+  try{ await qz.websocket.connect({ retries:1, delay:1 }); qzState = "on"; }
+  catch(e){ qzState = "off"; }
+  updatePrintBar();
+  return qzState === "on";
+}
+async function qzListPrinters(){
+  if(!(await qzConnect())) return [];
+  try{ qzPrinters = await qz.printers.find(); }catch(e){ qzPrinters = []; }
+  if(!PRN.name){ try{ PRN.name = await qz.printers.getDefault(); }catch(e){} }
+  return qzPrinters;
+}
+function startQzWatch(){
+  clearInterval(qzReconnect);
+  if(PRN.auto) qzConnect();
+  qzReconnect = setInterval(()=>{ if(PRN.auto && qzState!=="on" && qzState!=="connecting") qzConnect().then(ok=>{ if(ok) autoPrint(); }); }, 20000);
+}
+
+/* imprime uma comanda; devolve true se saiu pela impressora */
+async function printOrder(o, {manual=false}={}){
+  const html = comandaHTML(o);
+  if(PRN.name && await qzConnect()){
+    try{
+      const cfg = qz.configs.create(PRN.name, { units:"mm", size:{ width:80 }, margins:0, colorType:"blackwhite", interpolation:"nearest-neighbor" });
+      await qz.print(cfg, [{ type:"pixel", format:"html", flavor:"plain", data: html }]);
+      await markPrinted(o);
+      if(manual) toast(`Comanda #${o.num} enviada para a impressora`);
+      return true;
+    }catch(e){
+      console.error("impressão", e);
+      if(manual) toast("A impressora não respondeu. Confira se ela está ligada e com papel.");
+      if(!manual) return false;
+    }
+  }
+  if(manual){ browserPrint(html); await markPrinted(o); }
+  return false;
+}
+function browserPrint(html){
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(f);
+  const d = f.contentWindow.document;
+  d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:80mm auto;margin:0}body{margin:0}</style></head><body>${html}</body></html>`); d.close();
+  setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(), 2000); }, 300);
+}
+/* pedidos já impressos por este computador (nunca imprime o mesmo duas vezes sozinho) */
+let printedHere = new Set(LS.get("ii-printed", []));
+async function markPrinted(o){
+  o.printed = new Date().toISOString();
+  printedHere.add(o.id); LS.set("ii-printed", [...printedHere].slice(-500));
+  try{ await SB.from("pedidos").update({ impresso_em: o.printed }).eq("id", o.id); }catch(e){}
+}
+
+/* impressão automática: só neste computador, só pedidos novos ainda não impressos */
+const printing = new Set(), printFailAt = {};
+let autoBusy = false;
+async function autoPrint(){
+  if(!PRN.auto || !PRN.name || autoBusy) return;
+  const limite = Date.now() - 24*3600*1000;
+  const fila = DB.orders.filter(o=>o.status==="novo" && !o.printed && !printedHere.has(o.id) && !printing.has(o.id) && new Date(o.created).getTime()>limite
+    && !(printFailAt[o.id] && Date.now()-printFailAt[o.id] < 60000)).reverse();
+  if(!fila.length) return;
+  autoBusy = true;
+  try{
+    if(!(await qzConnect())) return;
+    for(const o of fila){
+      // outra aba deste computador já está imprimindo?
+      const lockKey = "ii-lock-"+o.id, lock = LS.get(lockKey, 0);
+      if(Date.now()-lock < 120000) continue;
+      LS.set(lockKey, Date.now()); printing.add(o.id);
+      const ok = await printOrder(o);
+      printing.delete(o.id);
+      if(!ok){ printFailAt[o.id] = Date.now(); try{ localStorage.removeItem(lockKey); }catch(e){} toast(`Não consegui imprimir o pedido #${o.num}. Confira a impressora.`); break; }
+    }
+  } finally { autoBusy = false; updatePrintBar(); }
+}
+
+/* ---------- barra da impressora (tela de pedidos) ---------- */
+function printBarHTML(){
+  const st = !PRN.auto ? ["", "Impressão automática desligada neste aparelho", "Ligue no computador da loja para a comanda sair sozinha."]
+    : qzState==="on" ? ["on", "Impressão automática ligada", `Impressora: ${esc(PRN.name||"não escolhida")}`]
+    : qzState==="connecting" ? ["", "Conectando à impressora…", "Aguarde um instante."]
+    : qzState==="nolib" ? ["off", "Não foi possível carregar a impressão", "Verifique a internet e atualize a página."]
+    : ["off", "Impressora desconectada", "Abra o programa QZ Tray neste computador."];
+  return `<div class="printbar" id="printBar"><span class="dot ${st[0]}"></span><span class="txt"><b>${st[1]}</b><span class="muted">${st[2]}</span></span><button class="btn btn-ghost btn-sm" type="button" id="printCfg">${ic("print")}Impressora</button></div>`;
+}
+function bindPrintBar(){ const b = $("#printCfg"); if(b) b.onclick = openPrintSettings; }
+function updatePrintBar(){ const bar = $("#printBar"); if(bar){ bar.outerHTML = printBarHTML(); bindPrintBar(); } }
+
+async function openPrintSettings(){
+  openSheet({ title:"Impressora", body:`
+    <p class="muted" style="margin:0">Estas opções valem só para <b>este aparelho</b>. Ligue a impressão automática apenas no computador da loja, onde a impressora está conectada.</p>
+    <label class="rc"><input type="checkbox" id="pAuto" ${PRN.auto?"checked":""}><span><b>Imprimir pedidos novos automaticamente</b><br><span class="muted small">A comanda sai sozinha assim que o cliente confirma no site.</span></span></label>
+    <div class="fld"><label for="pName">Impressora</label><select class="in" id="pName"><option>Procurando impressoras…</option></select>
+      <span class="hint" id="pHint">O programa QZ Tray precisa estar aberto neste computador.</span></div>`,
+    foot:`<button class="btn btn-ghost" type="button" id="pTest">${ic("print")}Imprimir teste</button><button class="btn btn-primary" type="button" id="pSave">Salvar</button>`,
+    onMount: async s=>{
+      const list = await qzListPrinters();
+      const sel = $("#pName", s);
+      if(list.length){
+        sel.innerHTML = list.map(n=>`<option ${n===PRN.name?"selected":""}>${esc(n)}</option>`).join("");
+        $("#pHint", s).textContent = "Escolha a impressora térmica da loja.";
+      } else {
+        sel.innerHTML = `<option value="">Nenhuma impressora encontrada</option>`;
+        $("#pHint", s).textContent = qzState==="nolib" ? "Não foi possível carregar a impressão. Verifique a internet." : "Não achei o QZ Tray. Abra o programa QZ Tray neste computador e toque em Impressora de novo.";
+      }
+      const save = ()=>{ PRN.auto = $("#pAuto", s).checked; if(sel.value) PRN.name = sel.value; startQzWatch(); };
+      $("#pSave", s).onclick = ()=>{ save(); closeSheet(); render(); toast(PRN.auto ? "Impressão automática ligada neste aparelho" : "Impressão automática desligada"); autoPrint(); };
+      $("#pTest", s).onclick = e=>busy(e.currentTarget, async()=>{
+        save();
+        const teste = { id:"teste", num:"0000", created:new Date().toISOString(), name:"Cliente Teste", phone:"88999999999", mode:"entrega", bairro:"COHAB 1", address:"Rua Exemplo, 123", ref:"Perto da praça",
+          fee:5, date:new Date().toISOString().slice(0,10), time:"15:00", pay:"Pix", troco:"", obs:"Escrever Feliz Aniversário, Maria", status:"novo", sub:70, total:75,
+          items:[{label:"Torta confeitada", detail:"Ninho com morango", qty:1, price:70}] };
+        if(!PRN.name || !(await qzConnect())){ toast("Não achei o QZ Tray. Abra o programa e tente de novo."); return; }
+        try{
+          const cfg = qz.configs.create(PRN.name, { units:"mm", size:{ width:80 }, margins:0, colorType:"blackwhite", interpolation:"nearest-neighbor" });
+          await qz.print(cfg, [{ type:"pixel", format:"html", flavor:"plain", data: comandaHTML(teste) }]);
+          toast("Teste enviado para a impressora");
+        }catch(err){ console.error(err); toast("A impressora não respondeu: " + (err?.message||err)); }
+      });
+    }});
+}
+
+/* ---------- mensagens prontas de WhatsApp ---------- */
+function waText(o, tipo){
+  const nome = o.name.split(" ")[0];
+  const itens = o.items.map(i=>`• ${i.qty}x ${i.label}${i.detail?` (${i.detail})`:""}`).join("\n");
+  const ent = o.mode==="entrega";
+  const quando = `${fmtDate(o.date)}${o.time?` às ${o.time}`:""}`;
+  const total = `${brl(o.total)}${ent&&o.fee==null?" + taxa de entrega":""}`;
+  if(tipo==="confirmar") return `Olá, ${nome}! Aqui é da Iarla Ingrid 💛\nRecebemos seu pedido nº ${o.num}:\n${itens}\n\nTotal: ${total}\n${ent?`Entrega: ${o.address}${o.bairro?` – ${o.bairro}`:""}`:"Retirada na loja"}\nPara: ${quando}\nPagamento: ${o.pay}${o.troco?` (troco para ${o.troco})`:""}\n\nPosso confirmar?`;
+  if(tipo==="confirmado") return `Pedido nº ${o.num} confirmado, ${nome}! 🎂\n${ent?"Entregamos":"Fica pronto para retirada"} ${quando}. Qualquer coisa, é só chamar aqui.`;
+  if(tipo==="saiu") return `Oi, ${nome}! Seu pedido nº ${o.num} saiu para entrega 🛵 Já já chega aí!`;
+  if(tipo==="pronto") return `Oi, ${nome}! Seu pedido nº ${o.num} está pronto para retirada 💛\nEndereço: ${DB.store?.address||"Rua Vicente Ferreira da Ponte, 369 · COHAB 1"}`;
+  return "";
+}
+function waButtons(o, waNum){
+  const link = t => `https://wa.me/${waNum}?text=${encodeURIComponent(waText(o,t))}`;
+  const b = (t, label) => `<a class="btn btn-ghost btn-block" href="${link(t)}" target="_blank" rel="noopener">${ic("wa")}${label}</a>`;
+  const nome = esc(o.name.split(" ")[0]);
+  if(o.status==="novo") return b("confirmar", `Confirmar com ${nome} no WhatsApp`);
+  if(o.status==="confirmado") return b("confirmado", "Avisar que está confirmado") + (o.mode==="entrega" ? b("saiu", "Avisar que saiu para entrega") : b("pronto", "Avisar que está pronto para retirada"));
+  return `<a class="btn btn-ghost btn-block" href="https://wa.me/${waNum}" target="_blank" rel="noopener">${ic("wa")}Chamar ${nome} no WhatsApp</a>`;
+}
+
 /* ================= login ================= */
 let currentEmail = "";
 function showLogin(msg){ $("#boot").hidden = true; $("#app").hidden = true; $("#login").hidden = false; const e=$("#lgErr"); e.hidden=!msg; e.textContent=msg||""; }
@@ -1049,8 +1384,13 @@ async function enterApp(session){
   const { data, error } = await SB.from("admins").select("user_id").eq("user_id", session.user.id).maybeSingle();
   if(error || !data){ await SB.auth.signOut(); showLogin(error ? "Não foi possível verificar o acesso. Tente de novo." : "Este e-mail não tem acesso ao painel."); return; }
   try{ await loadAll(); }catch(e){ showLogin("Não foi possível carregar os dados. Verifique a internet e tente de novo."); return; }
-  $("#boot").hidden = true; $("#login").hidden = true; $("#app").hidden = false; render();
-  clearInterval(window._poll); window._poll = setInterval(async()=>{ if(document.hidden) return; try{ await loadOrders(); if(view==="pedidos"||view==="inicio") render(); else renderNav(); }catch(e){} }, 30000);
+  $("#boot").hidden = true; $("#login").hidden = true; $("#app").hidden = false;
+  // na primeira abertura neste aparelho, não toca alerta de pedidos antigos
+  if(!LS.get("ii-acked-init", false)){ DB.orders.forEach(o=>acked.add(o.id)); LS.set("ii-acked", [...acked]); LS.set("ii-acked-init", true); }
+  render(); renderAlert();
+  startRealtime(); startQzWatch(); autoPrint();
+  // segurança: confere os pedidos a cada 15 s, mesmo se o tempo real falhar
+  clearInterval(window._poll); window._poll = setInterval(refreshOrders, 15000);
 }
 $("#loginForm").onsubmit = async e=>{
   e.preventDefault();
@@ -1082,7 +1422,7 @@ function newPasswordSheet(){
       closeSheet(); toast("Senha alterada");
       const { data } = await SB.auth.getSession(); if(data.session && $("#app").hidden) enterApp(data.session); }); }});
 }
-async function logout(){ clearInterval(window._poll); await SB.auth.signOut(); $("#lg-pass").value=""; showLogin(""); }
+async function logout(){ clearInterval(window._poll); stopRealtime(); stopAlarm(); clearInterval(qzReconnect); $("#alertRoot").innerHTML=""; await SB.auth.signOut(); $("#lg-pass").value=""; showLogin(""); }
 
 (async function boot(){
   if(!window.supabase || !CFG.url || !CFG.key || /COLE/i.test(CFG.key)){ $("#boot").textContent = "Configuração pendente: cole a chave pública do Supabase no arquivo config.js."; return; }

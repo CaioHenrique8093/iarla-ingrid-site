@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Iarla Ingrid Padaria e Doceria</title>
-<meta name="description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido e envie pelo WhatsApp.">
+<meta name="description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido pelo site e receba a confirmação no WhatsApp.">
 <meta name="theme-color" content="#4A2C20">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="Iarla Ingrid Padaria e Doceria">
-<meta property="og:description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido e envie pelo WhatsApp.">
+<meta property="og:description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido pelo site e receba a confirmação no WhatsApp.">
 <meta property="og:image" content="https://iarlaingridpadaria.com.br/img/compartilhar.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -321,6 +321,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .send[aria-disabled="true"]{opacity:.55}
 .formerr{display:none;font-size:14px;color:#B3261E;font-weight:600;text-align:center}
 .formerr.on{display:block}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
 .preview summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--brown);min-height:40px;display:flex;align-items:center}
 .preview pre{margin:8px 0 0;padding:14px;border-radius:14px;background:#E7F6EC;color:#10301E;font:14px/1.5 var(--sans);white-space:pre-wrap;word-break:break-word;max-height:340px;overflow:auto}
@@ -438,7 +439,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <div>
         <span class="eyebrow in d1">Sobral · Delivery e retirada</span>
         <h1 class="in d2"><span class="l1">Feito com carinho para</span> <span class="script">adoçar</span> seus momentos</h1>
-        <p class="lead in d3">Bolos, tortas, docinhos e salgados para o seu dia a dia e para a sua festa. Monte seu pedido aqui e envie direto pelo WhatsApp.</p>
+        <p class="lead in d3">Bolos, tortas, docinhos e salgados para o seu dia a dia e para a sua festa. Monte seu pedido aqui pelo site e a gente confirma com você no WhatsApp.</p>
 
         <ul class="facts in d4">
           <li>
@@ -493,7 +494,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
         <a class="back" href="#inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Início</a>
         <span class="kicker">escolha e adicione</span>
         <h2>Nosso cardápio</h2>
-        <p>Toque em <strong>Adicionar</strong> nos itens que quiser. No final, você revisa o pedido e envia tudo pelo WhatsApp.</p>
+        <p>Toque em <strong>Adicionar</strong> nos itens que quiser. No final, você revisa e confirma o pedido aqui mesmo.</p>
       </div>
       <p class="loading" id="loading">Carregando cardápio…</p>
 
@@ -517,8 +518,8 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <div class="done" id="doneBox" hidden>
         <div class="done-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
         <h3 id="doneTitle">Pedido enviado!</h3>
-        <p id="doneText">Agora é só confirmar o envio da mensagem no WhatsApp. A loja responde por lá.</p>
-        <div class="done-acts"><a class="btn btn-wa" id="doneWa" href="#">Abrir o WhatsApp de novo</a><button class="btn btn-ghost" type="button" id="newOrder">Fazer outro pedido</button></div>
+        <p id="doneText">A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp para confirmar e combinar o pagamento.</p>
+        <div class="done-acts"><a class="btn btn-ghost" id="doneWa" href="#" target="_blank" rel="noopener">Falar com a loja</a><button class="btn btn-primary" type="button" id="newOrder">Fazer outro pedido</button></div>
       </div>
       <div class="order-grid" id="orderGrid">
         <div class="panel summary">
@@ -610,19 +611,16 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
               <textarea id="obs" name="obs" placeholder="Ex.: escrever “Feliz aniversário, Maria” na torta"></textarea>
             </div>
 
+            <div class="hp" aria-hidden="true"><label for="empresa">Empresa</label><input id="empresa" name="empresa" tabindex="-1" autocomplete="off"></div>
             <p class="formerr" id="formErr" role="alert"></p>
-            <button class="btn btn-wa send" id="sendBtn" type="button">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z"/><path d="M9 9.5c.3 2.3 2.2 4.3 4.5 4.8l1.2-1.2 2 .9c-.2 1.3-1.2 2-2.5 2-3.9 0-7-3.1-7-7 0-1.3.7-2.3 2-2.5l.9 2-1.1 1z"/></svg>
-              <span id="sendLbl">Enviar pedido pelo WhatsApp</span>
+            <button class="btn btn-primary send" id="sendBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+              <span id="sendLbl">Confirmar pedido</span>
             </button>
-            <a class="btn btn-ghost" id="fallbackBtn" href="#" hidden>Enviar mesmo assim pelo WhatsApp</a>
-            <p class="hint" style="margin:0;text-align:center"><span id="sendHint">Atendemos de seg a sex, 8h às 18h, e sáb, 8h às 13h.</span><br>Abre o WhatsApp da loja com o pedido já escrito. É só tocar em enviar.</p>
+            <a class="btn btn-wa" id="fallbackBtn" href="#" hidden>Enviar pelo WhatsApp</a>
+            <p class="hint" style="margin:0;text-align:center"><span id="sendHint">Atendemos de seg a sex, 8h às 18h, e sáb, 8h às 13h.</span><br>A loja recebe na hora e te chama no WhatsApp para confirmar.</p>
 
-            <details class="preview">
-              <summary>Ver como a mensagem vai chegar</summary>
-              <pre id="preview"></pre>
-              <button class="copy" type="button" id="copyBtn">Copiar mensagem</button>
-            </details>
+            <pre id="preview" hidden></pre>
             <p class="hint privacy">Seus dados são usados apenas para preparar e entregar o seu pedido.</p>
           </div>
         </form>
@@ -1010,18 +1008,32 @@ function payload(){
     referencia:v("ref"), data:v("data"), horario:v("hora"), pagamento:pag(), troco:v("troco"), obs:v("obs"),
     itens: cart.map(c=>({produto_id:c.pid, qtd:c.qty, tamanho:c.size, sabor:c.sabor})) };
 }
-function finish(num, msg){
-  const link = waLink(msg);
-  try{ localStorage.setItem("ii-last", JSON.stringify({num, link, at:Date.now()})); }catch(e){}
+function finish(num){
+  const fone = $("whats").value.trim();
+  try{ localStorage.setItem("ii-last", JSON.stringify({num, fone, at:Date.now()})); }catch(e){}
   cart.length = 0; saveCart(); renderBar(false); renderOrder();
   history.replaceState(null, "", "#pedido"); route();
-  showDone(num, link);
+  showDone(num, fone);
+}
+/* banco fora do ar: o pedido vai pelo WhatsApp, como antes */
+function finishWhatsApp(msg){
+  const link = waLink(msg);
+  cart.length = 0; saveCart(); renderBar(false); renderOrder();
+  history.replaceState(null, "", "#pedido"); route();
+  showDone(null, "", link);
   location.href = link;
 }
-function showDone(num, link){
+function showDone(num, fone, link){
   $("orderGrid").hidden = true; $("doneBox").hidden = false;
-  $("doneTitle").textContent = num ? `Pedido nº ${num} registrado!` : "Pedido pronto!";
-  $("doneWa").href = link;
+  if(link){
+    $("doneTitle").textContent = "Pedido pronto!";
+    $("doneText").textContent = "Agora é só tocar em enviar na conversa do WhatsApp. A loja responde por lá.";
+    $("doneWa").href = link; $("doneWa").textContent = "Abrir o WhatsApp de novo";
+  } else {
+    $("doneTitle").textContent = num ? `Pedido nº ${num} recebido!` : "Pedido recebido!";
+    $("doneText").textContent = `A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp${fone?`, no número ${fone},`:""} para confirmar e combinar o pagamento.`;
+    $("doneWa").href = waLink(num ? `Olá! Fiz o pedido nº ${num} pelo site.` : "Olá! Fiz um pedido pelo site."); $("doneWa").textContent = "Falar com a loja";
+  }
   $("pedido").scrollIntoView({block:"start"});
 }
 $("newOrder").onclick = () => { try{ localStorage.removeItem("ii-last"); }catch(e){} $("doneBox").hidden = true; $("orderGrid").hidden = false; goTo("#cardapio"); };
@@ -1030,7 +1042,8 @@ let sending = false;
 $("sendBtn").addEventListener("click", async ()=>{
   if(sending || !validate()) return;
   $("fallbackBtn").hidden = true;
-  if(!ONLINE){ finish(null, buildMessage()); return; }
+  if($("empresa").value){ finish(null); return; } // robô
+  if(!ONLINE){ finishWhatsApp(buildMessage()); return; }
   sending = true; $("sendBtn").disabled = true; $("sendLbl").textContent = "Enviando pedido…";
   try{
     const { data, error } = await SB.rpc("criar_pedido", { p: payload() });
@@ -1042,20 +1055,14 @@ $("sendBtn").addEventListener("click", async ()=>{
       }
       throw error;
     }
-    finish(data.numero, buildMessage(data.numero));
+    finish(data.numero);
   }catch(e){
-    flashErr("Não conseguimos registrar o pedido agora. Você pode enviar direto pelo WhatsApp.");
+    flashErr("Não conseguimos registrar o pedido agora. Tente de novo ou envie pelo WhatsApp.");
     const fb = $("fallbackBtn"); fb.hidden = false; fb.href = waLink(buildMessage());
-    fb.onclick = ()=>{ setTimeout(()=>{ cart.length=0; saveCart(); refresh(); showDone(null, fb.href); }, 300); };
+    fb.onclick = ()=>{ setTimeout(()=>{ cart.length=0; saveCart(); refresh(); showDone(null, "", fb.href); }, 300); };
   }finally{
-    sending = false; $("sendBtn").disabled = false; $("sendLbl").textContent = "Enviar pedido pelo WhatsApp";
+    sending = false; $("sendBtn").disabled = false; $("sendLbl").textContent = "Confirmar pedido";
   }
-});
-$("copyBtn").addEventListener("click", async e=>{
-  const b = e.currentTarget;
-  try{ await navigator.clipboard.writeText(buildMessage()); b.textContent = "Copiado"; }
-  catch(_){ const r = document.createRange(); r.selectNodeContents($("preview")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selecionado, copie com Ctrl+C"; }
-  setTimeout(()=>b.textContent="Copiar mensagem",1800);
 });
 function refresh(){ renderBar(true); renderOrder(); saveCart(); }
 
@@ -1138,7 +1145,7 @@ route();
   try{ await loadData(); }
   catch(e){ console.warn("Cardápio de reserva:", e); MENU = FALLBACK; }
   renderMenu(); fillStore(); renderBar(false); renderOrder();
-  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) { $("orderGrid").hidden = true; $("doneBox").hidden = false; $("doneTitle").textContent = last.num?`Pedido nº ${last.num} registrado!`:"Pedido pronto!"; $("doneWa").href = last.link; } }catch(e){}
+  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) showDone(last.num, last.fone||"", last.link); }catch(e){}
   if(isMenuHash(location.hash) && location.hash !== "#cardapio") route();
 })();
 </script>
