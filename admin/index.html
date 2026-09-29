@@ -1084,26 +1084,28 @@ const PRN = {
   get name(){ return LS.get("ii-printer", ""); }, set name(v){ LS.set("ii-printer", v||""); }
 };
 
-/* ---------- som ---------- */
-let audioCtx, soundOK = false;
+/* ---------- som (arquivo de áudio: bem mais alto que um bip gerado) ---------- */
+const ALERT_SND = new Audio("sons/novo-pedido.mp3");
+ALERT_SND.preload = "auto"; ALERT_SND.volume = 1;
+let soundOK = false, unlocking = false;
+/* libera o som no primeiro toque/clique (regra dos navegadores), tocando mudo */
 function unlockSound(){
-  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==="suspended") audioCtx.resume(); soundOK = audioCtx.state!=="suspended"; }catch(e){ soundOK = false; }
-  return soundOK;
+  if(soundOK || unlocking) return;
+  unlocking = true; ALERT_SND.muted = true;
+  const p = ALERT_SND.play();
+  (p && p.then ? p : Promise.resolve()).then(()=>{ ALERT_SND.pause(); ALERT_SND.currentTime = 0; soundOK = true; })
+    .catch(()=>{ soundOK = false; })
+    .finally(()=>{ ALERT_SND.muted = false; unlocking = false; renderAlert(); });
 }
 function beep(){
   try{
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.state==="suspended"){ audioCtx.resume(); }
-    const t0 = audioCtx.currentTime;
-    [[880,0],[1175,.16],[1568,.32]].forEach(([f,dt])=>{
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.0001,t0+dt); g.gain.exponentialRampToValueAtTime(0.35,t0+dt+.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+dt+.28);
-      o.start(t0+dt); o.stop(t0+dt+.3);
-    });
+    ALERT_SND.muted = false; ALERT_SND.currentTime = 0;
+    const p = ALERT_SND.play();
+    if(p && p.then) p.then(()=>{ if(!soundOK){ soundOK = true; renderAlert(); } }).catch(()=>{ if(soundOK){ soundOK = false; renderAlert(); } });
   }catch(e){}
 }
-["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev, ()=>{ if(!soundOK){ unlockSound(); renderAlert(); } }, {passive:true}));
+function silence(){ try{ ALERT_SND.pause(); ALERT_SND.currentTime = 0; }catch(e){} }
+["pointerdown","keydown","touchstart"].forEach(ev=>document.addEventListener(ev, e=>{ if(!soundOK && !(e.target && e.target.closest && e.target.closest("#soundOn"))) unlockSound(); }, {passive:true}));
 
 /* ---------- pedidos já vistos neste aparelho (param o alerta) ---------- */
 let acked = new Set(LS.get("ii-acked", []));
@@ -1121,20 +1123,20 @@ function renderAlert(){
   if(pend.length){
     const o = pend[pend.length-1];
     root.innerHTML = `<div class="alertbar">${ic("bell")}<span>${pend.length===1?`Novo pedido #${o.num} · ${esc(o.name)}`:`${pend.length} pedidos novos`}${soundOK?"":" · toque para ativar o som"}</span><button type="button" id="alertSee">Ver pedido</button></div>`;
-    $("#alertSee").onclick = ()=>{ unlockSound(); if(pend.length===1){ openOrder(o.id); } else { pend.forEach(x=>ackOrder(x.id)); ordFilter="novo"; go("pedidos"); } };
+    $("#alertSee").onclick = ()=>{ silence(); if(pend.length===1){ openOrder(o.id); } else { pend.forEach(x=>ackOrder(x.id)); ordFilter="novo"; go("pedidos"); } };
     startAlarm();
   } else {
     stopAlarm();
     document.body.classList.toggle("has-alert", !soundOK);
-    root.innerHTML = soundOK ? "" : `<div class="alertbar sound">${ic("bell")}<span>Toque aqui para ativar o som dos pedidos novos</span><button type="button" id="soundOn">Ativar som</button></div>`;
-    const b = $("#soundOn"); if(b) b.onclick = ()=>{ unlockSound(); beep(); renderAlert(); };
+    root.innerHTML = soundOK ? "" : `<div class="alertbar sound">${ic("bell")}<span>Toque aqui para ativar o som dos pedidos novos</span><button type="button" id="soundOn">Ativar e testar o som</button></div>`;
+    const b = $("#soundOn"); if(b) b.onclick = ()=>{ beep(); };
   }
   fitAlert();
 }
 function fitAlert(){ const bar=$("#alertRoot .alertbar"); document.documentElement.style.setProperty("--alert-h", (bar?bar.offsetHeight:0)+"px"); }
 window.addEventListener("resize", fitAlert);
-function startAlarm(){ if(alarmTimer) return; beep(); alarmTimer = setInterval(()=>{ if(pendingAlerts().length) beep(); else stopAlarm(); }, 4000); }
-function stopAlarm(){ clearInterval(alarmTimer); alarmTimer = null; }
+function startAlarm(){ if(alarmTimer) return; beep(); alarmTimer = setInterval(()=>{ if(pendingAlerts().length) beep(); else stopAlarm(); }, 7000); }
+function stopAlarm(){ if(alarmTimer){ clearInterval(alarmTimer); alarmTimer = null; silence(); } }
 
 /* ---------- tempo real: pedido novo chega na hora ---------- */
 let rtChannel = null, rtTimer = null;
