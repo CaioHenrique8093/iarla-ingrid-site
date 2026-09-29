@@ -1165,6 +1165,8 @@ function whenLabel(iso){
   const amanha = new Date(Date.UTC(y,m-1,d+1)).toISOString().slice(0,10);
   return iso===hoje ? "HOJE" : iso===amanha ? "AMANHÃ" : iso<hoje ? "ATRASADO" : "";
 }
+const DIA_CHEIO = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+function dataCheia(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-").map(Number); return `${DIA_CHEIO[new Date(y,m-1,d).getDay()]}, ${String(d).padStart(2,"0")}/${String(m).padStart(2,"0")}`; }
 function comandaHTML(o){
   const ent = o.mode==="entrega";
   const hr = '<div style="border-top:2px dashed #000;margin:8px 0"></div>';
@@ -1192,7 +1194,7 @@ function comandaHTML(o){
     ${band(ent?"ENTREGA":"RETIRADA NA LOJA")}
     <div style="border:2px solid #000;border-radius:4px;text-align:center;padding:5px 4px">
       ${rel?`<div style="font-size:22px;font-weight:900;letter-spacing:1px">${rel}</div>`:""}
-      <div style="font-size:17px;font-weight:900">${esc(fmtDate(o.date))}${o.time?` · ${esc(o.time)}`:""}</div>
+      <div style="font-size:17px;font-weight:900">${esc(dataCheia(o.date))}${o.time?` · ${esc(o.time)}`:""}</div>
     </div>
     ${hr}
     <div style="font-size:12px;letter-spacing:1px">ITENS (${qtdTotal})</div>
