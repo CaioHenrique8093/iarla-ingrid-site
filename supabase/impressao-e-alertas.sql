@@ -64,3 +64,16 @@ select
   (select count(*) from pg_trigger where tgname = 'trg_limitar_pedidos') as trava_pedidos,
   (select count(*) from pg_publication_tables
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'pedidos') as tempo_real;
+
+-- =====================================================================
+-- 4) Chave Pix da loja (a Iarla pode trocar em Loja > Formas de pagamento)
+-- =====================================================================
+alter table public.configuracoes add column if not exists chave_pix   text default '65815467000135';
+alter table public.configuracoes add column if not exists pix_tipo    text default 'CNPJ';
+alter table public.configuracoes add column if not exists pix_titular text default 'Iarla Ingrid Padaria e Doceria';
+update public.configuracoes
+   set chave_pix = coalesce(nullif(chave_pix, ''), '65815467000135'),
+       pix_tipo = coalesce(nullif(pix_tipo, ''), 'CNPJ'),
+       pix_titular = coalesce(nullif(pix_titular, ''), 'Iarla Ingrid Padaria e Doceria')
+ where id = 1;
+select chave_pix, pix_tipo, pix_titular from public.configuracoes where id = 1;

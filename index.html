@@ -409,6 +409,17 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .done h3{margin:6px 0 0;font-family:var(--display);font-weight:600;font-size:32px;color:var(--brown)}
 .done p{margin:0;color:var(--ink-soft);max-width:40ch}
 .done-acts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
+.pixbox{width:100%;display:grid;gap:10px;text-align:left;margin-top:6px;padding:16px;border:1.5px solid var(--line);border-radius:18px;background:var(--bg)}
+.pixbox h4{margin:0;font-size:16px;color:var(--brown);display:flex;align-items:center;gap:8px}
+.pixbox .val{font-family:var(--display);font-size:34px;font-weight:600;color:var(--brown);line-height:1}
+.pixbox .sub{font-size:13.5px;color:var(--ink-soft)}
+.pixkey{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:14px;background:var(--surface);border:1px dashed var(--line)}
+.pixkey code{display:block;font:700 16px/1.25 var(--sans);letter-spacing:.2px;color:var(--ink);white-space:nowrap}
+.pixkey button{flex:1 0 auto;max-width:100%;min-height:40px;padding:0 14px;border-radius:12px;border:1.5px solid var(--brown);background:var(--brown);color:var(--on-brown);font-weight:700;cursor:pointer}
+.pixbox .btn{width:100%;text-align:center;gap:8px}
+.pixbox .btn svg{width:20px;height:20px;flex:none}
+.totals .row.pixnow{margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-weight:700;color:var(--brown)}
+.totals .row.pixrest{font-size:14px;color:var(--ink-soft)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .info.warn{color:#F0B35A;background:#3A2A12}:root:not([data-theme="light"]) .info.bad{color:#F2877F;background:#3B1A18}}
 </style>
 </head>
@@ -518,6 +529,14 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
         <div class="done-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
         <h3 id="doneTitle">Pedido enviado!</h3>
         <p id="doneText">A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp para confirmar e combinar o pagamento.</p>
+        <div class="pixbox" id="pixBox" hidden>
+          <h4>Pague com Pix</h4>
+          <div><div class="val" id="pixVal">R$ 0,00</div><div class="sub" id="pixValSub"></div></div>
+          <div class="pixkey"><div style="flex:1 1 auto"><div class="sub" id="pixKeyLbl">Chave Pix (CNPJ)</div><code id="pixKey"></code></div><button type="button" id="pixCopy">Copiar</button></div>
+          <div class="sub">Nome: <b id="pixName"></b></div>
+          <div class="sub">Depois de pagar, envie o comprovante no WhatsApp da loja.</div>
+          <a class="btn btn-wa" id="pixSend" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z"/><path d="M9 9.5c.3 2.3 2.2 4.3 4.5 4.8l1.2-1.2 2 .9c-.2 1.3-1.2 2-2.5 2-3.9 0-7-3.1-7-7 0-1.3.7-2.3 2-2.5l.9 2-1.1 1z"/></svg>Enviar comprovante</a>
+        </div>
         <div class="done-acts"><a class="btn btn-ghost" id="doneWa" href="#" target="_blank" rel="noopener">Falar com a loja</a><button class="btn btn-primary" type="button" id="newOrder">Fazer outro pedido</button></div>
       </div>
       <div class="order-grid" id="orderGrid">
@@ -528,6 +547,8 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
             <div class="row"><span>Subtotal</span><span class="sub" id="subtotal">R$ 0,00</span></div>
             <div class="row fee" id="feeRow"><span>Entrega</span><em id="feeVal">escolha o bairro</em></div>
             <div class="row" id="totalRow" hidden><span><b>Total</b></span><span class="sub" id="totalVal">R$ 0,00</span></div>
+            <div class="row pixnow" id="pixNowRow" hidden><span id="pixNowLbl">Pagar agora no Pix</span><span id="pixNowVal">R$ 0,00</span></div>
+            <div class="row pixrest" id="pixRestRow" hidden><span id="pixRestLbl">Restante na retirada</span><span id="pixRestVal">R$ 0,00</span></div>
           </div>
         </div>
 
@@ -599,6 +620,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
                 <input type="radio" id="p-1" name="pag" value="Cartão"><label for="p-1"><strong>Cartão</strong></label>
                 <input type="radio" id="p-2" name="pag" value="Dinheiro"><label for="p-2"><strong>Dinheiro</strong></label>
               </div>
+            </div>
+            <div class="notice" id="pixHint" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>
+              <span id="pixHintTxt"></span>
             </div>
             <div class="fld" id="trocoBox" hidden>
               <label for="troco">Troco para quanto?</label>
@@ -710,7 +735,8 @@ let STORE = {
   maps_url:"https://maps.app.goo.gl/b3YLrxRe1buPjxUg9",
   horarios:[{aberto:false,de:"08:00",ate:"12:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"13:00"}],
   pagamentos:{"Pix":true,"Cartão":true,"Dinheiro":true}, antecedencia_dias:1,
-  entrega_ativa:true, bairro_fora:"combinar", aviso_ativo:false, aviso_texto:""
+  entrega_ativa:true, bairro_fora:"combinar", aviso_ativo:false, aviso_texto:"",
+  chave_pix:"65815467000135", pix_tipo:"CNPJ", pix_titular:"Iarla Ingrid Padaria e Doceria"
 };
 let BAIRROS = [], FECH = [], MENU = [], byId = {};
 
@@ -894,6 +920,23 @@ function bairroInfo(){
   return b ? {fee:+b.taxa, name:b.nome, known:true, id:b.id} : {fee:null, name:"", known:false};
 }
 const subtotal = () => cart.reduce((a,c)=>a+c.qty*c.price,0);
+/* Pix: encomenda (produto sem limite de estoque) paga 50% agora;
+   pronta-entrega (estoque limitado) paga 100%; a taxa de entrega vai junto no Pix. */
+const cents = v => Math.round(v*100)/100;
+function pixPlan(){
+  const b = bairroInfo(), ent = modo()==="entrega";
+  let enc = 0, pronta = 0;
+  cart.forEach(c=>{ const it = byId[c.pid], v = c.qty*c.price; if(it && it.stock!=null) pronta += v; else enc += v; });
+  const fee = ent && b.known ? (b.fee||0) : 0;
+  const agora = cents(pronta + enc/2 + fee), resto = cents(enc/2);
+  return { agora, resto, total: cents(pronta+enc+fee), enc: cents(enc), pronta: cents(pronta), feeAberta: ent && !b.known };
+}
+function fmtPixKey(k, tipo){
+  const d = String(k||"").replace(/\D/g,"");
+  if(tipo==="CNPJ" && d.length===14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  if(tipo==="CPF" && d.length===11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+  return String(k||"");
+}
 
 function renderOrder(){
   const box = $("lines");
@@ -929,6 +972,21 @@ function updateTotals(){
   $("totalVal").textContent = brl(sub + (ent&&b.known?b.fee:0));
   $("bairroOutro").hidden = !(b.outro);
   $("trocoBox").hidden = pag()!=="Dinheiro";
+  const isPix = pag()==="Pix" && cart.length, pp = pixPlan();
+  $("pixNowRow").hidden = !isPix; $("pixRestRow").hidden = !isPix || !(pp.resto>0);
+  $("pixHint").hidden = !isPix;
+  if(isPix){
+    $("pixNowLbl").textContent = pp.resto>0 ? "Pagar agora no Pix (sinal)" : "Pagar agora no Pix";
+    $("pixNowVal").textContent = brl(pp.agora) + (pp.feeAberta?" + taxa":"");
+    $("pixRestLbl").textContent = `Restante na ${ent?"entrega":"retirada"}`;
+    $("pixRestVal").textContent = brl(pp.resto);
+    const onde = ent ? "entrega" : "retirada";
+    $("pixHintTxt").textContent = (pp.enc>0 && pp.pronta>0)
+      ? `Encomendas pagam 50% agora no Pix e o restante na ${onde}. Itens de pronta-entrega são pagos por inteiro. A chave Pix aparece ao confirmar.`
+      : pp.enc>0
+      ? `Encomenda: você paga 50% agora no Pix e o restante na ${onde}. A chave Pix aparece ao confirmar.`
+      : "Pagamento total no Pix. A chave aparece ao confirmar o pedido.";
+  }
   $("preview").textContent = buildMessage();
 }
 $("lines").addEventListener("click", e=>{
@@ -1008,10 +1066,11 @@ function payload(){
 }
 function finish(num){
   const fone = $("whats").value.trim();
-  try{ localStorage.setItem("ii-last", JSON.stringify({num, fone, at:Date.now()})); }catch(e){}
+  const pix = pag()==="Pix" ? Object.assign(pixPlan(), {modo:modo()}) : null;
+  try{ localStorage.setItem("ii-last", JSON.stringify({num, fone, pix, at:Date.now()})); }catch(e){}
   cart.length = 0; saveCart(); renderBar(false); renderOrder();
   history.replaceState(null, "", "#pedido"); route();
-  showDone(num, fone);
+  showDone(num, fone, null, pix);
 }
 /* banco fora do ar: o pedido vai pelo WhatsApp, como antes */
 function finishWhatsApp(msg){
@@ -1021,8 +1080,9 @@ function finishWhatsApp(msg){
   showDone(null, "", link);
   location.href = link;
 }
-function showDone(num, fone, link){
+function showDone(num, fone, link, pix){
   $("orderGrid").hidden = true; $("doneBox").hidden = false;
+  $("pixBox").hidden = !(pix && !link);
   if(link){
     $("doneTitle").textContent = "Pedido pronto!";
     $("doneText").textContent = "Agora é só tocar em enviar na conversa do WhatsApp. A loja responde por lá.";
@@ -1031,9 +1091,24 @@ function showDone(num, fone, link){
     $("doneTitle").textContent = num ? `Pedido nº ${num} recebido!` : "Pedido recebido!";
     $("doneText").textContent = `A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp${fone?`, no número ${fone},`:""} para confirmar e combinar o pagamento.`;
     $("doneWa").href = waLink(num ? `Olá! Fiz o pedido nº ${num} pelo site.` : "Olá! Fiz um pedido pelo site."); $("doneWa").textContent = "Falar com a loja";
+    if(pix){
+      $("doneText").textContent = `A loja já recebeu o seu pedido. Faça o Pix abaixo e envie o comprovante. A Iarla confirma com você pelo WhatsApp${fone?`, no número ${fone}`:""}.`;
+      $("pixVal").textContent = brl(pix.agora) + (pix.feeAberta?" + taxa":"");
+      $("pixValSub").textContent = pix.resto>0 ? `Sinal de 50% da encomenda. Restante de ${brl(pix.resto)} na ${pix.modo==="entrega"?"entrega":"retirada"}.` : "Valor total do pedido.";
+      $("pixKeyLbl").textContent = `Chave Pix (${STORE.pix_tipo||"chave"})`;
+      $("pixKey").textContent = fmtPixKey(STORE.chave_pix, STORE.pix_tipo);
+      $("pixName").textContent = STORE.pix_titular || "";
+      $("pixSend").href = waLink(`Olá! Segue o comprovante do Pix de ${brl(pix.agora)} do pedido${num?` nº ${num}`:""}.`);
+    }
   }
   $("pedido").scrollIntoView({block:"start"});
 }
+$("pixCopy").onclick = async e=>{
+  const b = e.currentTarget, raw = String(STORE.chave_pix||"").trim(), key = /^(CNPJ|CPF|Celular)$/i.test(STORE.pix_tipo||"") ? raw.replace(/[^\d+]/g,"") : raw;
+  try{ await navigator.clipboard.writeText(key); b.textContent = "Copiada!"; }
+  catch(_){ const r = document.createRange(); r.selectNodeContents($("pixKey")); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r); b.textContent = "Selecionada"; }
+  setTimeout(()=>b.textContent="Copiar", 1800);
+};
 $("newOrder").onclick = () => { try{ localStorage.removeItem("ii-last"); }catch(e){} $("doneBox").hidden = true; $("orderGrid").hidden = false; goTo("#cardapio"); };
 
 let sending = false;
@@ -1142,7 +1217,7 @@ route();
   try{ await loadData(); }
   catch(e){ console.warn("Cardápio de reserva:", e); MENU = FALLBACK; }
   renderMenu(); fillStore(); renderBar(false); renderOrder();
-  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) showDone(last.num, last.fone||"", last.link); }catch(e){}
+  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) showDone(last.num, last.fone||"", last.link, last.pix); }catch(e){}
   if(isMenuHash(location.hash) && location.hash !== "#cardapio") route();
 })();
 </script>

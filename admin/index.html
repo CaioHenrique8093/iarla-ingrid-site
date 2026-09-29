@@ -464,7 +464,8 @@ const orderFrom = r => ({id:r.id, num:r.numero, printed:r.impresso_em||(typeof p
 function storeFrom(c, f){
   return { whatsapp:fmtPhone(c.whatsapp), instagram:c.instagram, address:c.endereco, maps:c.maps_url,
     hours:c.horarios.map((h,i)=>({d:DIAS[i],open:h.aberto,from:h.de,to:h.ate})), closures:f.map(x=>({id:x.id,date:x.data,reason:x.motivo})),
-    pay:Object.assign({"Pix":false,"Cartão":false,"Dinheiro":false}, c.pagamentos), lead:c.antecedencia_dias, banner:{on:c.aviso_ativo,text:c.aviso_texto} };
+    pay:Object.assign({"Pix":false,"Cartão":false,"Dinheiro":false}, c.pagamentos), lead:c.antecedencia_dias, banner:{on:c.aviso_ativo,text:c.aviso_texto},
+    pixKey:c.chave_pix ?? "65815467000135", pixType:c.pix_tipo ?? "CNPJ", pixName:c.pix_titular ?? "Iarla Ingrid Padaria e Doceria", pixCols: "chave_pix" in c };
 }
 
 async function loadCatalog(){
@@ -639,7 +640,7 @@ function openOrder(id){
       <dt>WhatsApp</dt><dd>${esc(fmtPhone(o.phone))}</dd>
       <dt>Receber</dt><dd>${o.mode==="entrega"?`Entrega · ${esc(o.address)} – ${esc(o.bairro)}${o.ref?` (ref.: ${esc(o.ref)})`:""}`:"Retirada na loja"}</dd>
       <dt>Para</dt><dd>${fmtDate(o.date)}${o.time?` às ${esc(o.time)}`:""}</dd>
-      <dt>Pagamento</dt><dd>${esc(o.pay)}${o.troco?` · troco para ${esc(o.troco)}`:""}</dd>
+      <dt>Pagamento</dt><dd>${esc(o.pay)}${o.troco?` · troco para ${esc(o.troco)}`:""}${(()=>{ const pp = pixPlanOf(o); return pp ? `<br><span class="muted small">No Pix: <b>${brl(pp.agora)}</b>${pp.feeAberta?" + taxa":""}${pp.resto>0?` · restante ${brl(pp.resto)} na ${o.mode==="entrega"?"entrega":"retirada"}`:""}</span>` : ""; })()}</dd>
       ${o.obs?`<dt>Obs.</dt><dd>${esc(o.obs)}</dd>`:""}
     </dl>
     <div class="wamsgs">${waButtons(o, waNum)}</div>
@@ -1016,6 +1017,11 @@ function renderStore(){
         </section>
         <section class="card"><h2>Formas de pagamento</h2>
           <div class="grid3">${Object.keys(S.pay).map(k=>`<label class="sw" style="flex-direction:column;align-items:flex-start;gap:6px"><span>${esc(k)}</span><input type="checkbox" data-pay="${esc(k)}" ${S.pay[k]?"checked":""}><span class="tr"></span></label>`).join("")}</div>
+          <div style="display:grid;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+            <div class="grid2"><div class="fld"><label for="sPixT">Tipo da chave Pix</label><select class="in" id="sPixT">${["CNPJ","CPF","Celular","E-mail","Aleatória"].map(t=>`<option ${t===S.pixType?"selected":""}>${t}</option>`).join("")}</select></div>
+            <div class="fld"><label for="sPixK">Chave Pix</label><input class="in" id="sPixK" value="${esc(S.pixKey)}"></div></div>
+            <div class="fld"><label for="sPixN">Nome que aparece no Pix</label><input class="in" id="sPixN" value="${esc(S.pixName)}"><span class="hint">O cliente vê a chave e esse nome ao confirmar o pedido. Encomendas pagam 50% no Pix; pronta-entrega, 100%.</span></div>
+          </div>
         </section>
       </div>
       <section class="card"><h2>Aviso no topo do site</h2>
@@ -1055,6 +1061,7 @@ function renderStore(){
     const patch = { whatsapp: wa.length<=11 ? "55"+wa : wa, instagram:$("#sIg").value.trim(), endereco:$("#sAd").value.trim(), maps_url:$("#sMp").value.trim(),
       horarios:S.hours.map(h=>({aberto:h.open,de:h.from,ate:h.to})), pagamentos:S.pay, antecedencia_dias:S.lead,
       aviso_ativo:$("#bnOn").checked, aviso_texto:$("#bnText").value.trim() };
+    if(S.pixCols){ patch.chave_pix = $("#sPixK").value.trim(); patch.pix_tipo = $("#sPixT").value; patch.pix_titular = $("#sPixN").value.trim(); }
     const removed = DB.store.closures.filter(c=>!S.closures.some(x=>x.id===c.id)).map(c=>c.id);
     const added = S.closures.filter(c=>c.isNew).map(c=>({data:c.date, motivo:c.reason}));
     try{
@@ -1156,6 +1163,21 @@ function stopRealtime(){ try{ if(rtChannel) SB.removeChannel(rtChannel); }catch(
 /* chamado sempre que a lista de pedidos é recarregada */
 function afterOrders(){ renderAlert(); autoPrint(); }
 
+/* ---------- Pix: encomenda (sem limite de estoque) paga 50%; pronta-entrega 100%; taxa junto ---------- */
+function pixPlanOf(o){
+  if(o.pay!=="Pix") return null;
+  let enc = 0, pronta = 0;
+  o.items.forEach(i=>{ const p = DB.products.find(x=>x.id===i.pid), v = i.qty*i.price; if(p && p.stockOn) pronta += v; else enc += v; });
+  const fee = o.mode==="entrega" ? (o.fee||0) : 0, r = v => Math.round(v*100)/100;
+  return { agora: r(pronta + enc/2 + fee), resto: r(enc/2), feeAberta: o.mode==="entrega" && o.fee==null };
+}
+function pixKeyFmt(){
+  const k = String(DB.store?.pixKey||""), d = k.replace(/\D/g,""), t = DB.store?.pixType;
+  if(t==="CNPJ" && d.length===14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  if(t==="CPF" && d.length===11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+  return k;
+}
+
 /* ---------- comanda (80 mm) ---------- */
 const COMANDA_LOGO = "data:image/png;base64,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";
 const COMANDA_CSS = "font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;width:270px;padding:4px 4px 22px;margin:0;box-sizing:border-box;font-size:13px;line-height:1.3;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact";
@@ -1203,7 +1225,17 @@ function comandaHTML(o){
     ${row("Subtotal", brl(o.sub))}
     ${ent?row(`Entrega${o.bairro?` · ${esc(o.bairro)}`:""}`, o.fee==null?"a combinar":brl(o.fee)):""}
     ${row("TOTAL", brl(o.total)+(ent&&o.fee==null?" + taxa":""), true)}
-    <div style="border:2px solid #000;border-radius:4px;padding:4px 6px;margin-top:6px;font-size:14px;font-weight:900;text-align:center">PAGAMENTO: ${esc(String(o.pay||"").toUpperCase())}${o.troco?`<div style="font-size:13px">Troco para ${esc(o.troco)}</div>`:""}</div>
+    ${(()=>{ const pp = pixPlanOf(o), onde = ent ? "NA ENTREGA" : "NA RETIRADA";
+      if(pp) return `<div style="border:2px solid #000;border-radius:4px;padding:5px 6px;margin-top:6px;text-align:center">
+        <div style="font-size:14px;font-weight:900">PAGAMENTO: PIX</div>
+        <div style="font-size:13px">${pp.resto>0?"Sinal":"Valor"} no Pix: ${brl(pp.agora)}${pp.feeAberta?" + taxa":""} (conferir comprovante)</div>
+        ${pp.resto>0?`<div style="font-size:16px;font-weight:900;margin-top:3px">RECEBER ${onde}: ${brl(pp.resto)}</div>`:`<div style="font-size:14px;font-weight:900;margin-top:3px">NADA A RECEBER ${onde}</div>`}
+      </div>`;
+      return `<div style="border:2px solid #000;border-radius:4px;padding:5px 6px;margin-top:6px;text-align:center">
+        <div style="font-size:14px;font-weight:900">PAGAMENTO: ${esc(String(o.pay||"").toUpperCase())}</div>
+        <div style="font-size:16px;font-weight:900;margin-top:3px">RECEBER ${onde}: ${brl(o.total)}${ent&&o.fee==null?" + taxa":""}</div>
+        ${o.troco?`<div style="font-size:13px">Troco para ${esc(o.troco)}</div>`:""}
+      </div>`; })()}
     ${o.obs?`${band("OBSERVAÇÃO",15)}<div style="font-size:16px;font-weight:900;padding:2px 2px 0">${esc(o.obs)}</div>`:""}
     ${hr}
     <div style="font-size:12px;letter-spacing:1px">CLIENTE</div>
@@ -1390,7 +1422,9 @@ function waText(o, tipo){
   const ent = o.mode==="entrega";
   const quando = `${fmtDate(o.date)}${o.time?` às ${o.time}`:""}`;
   const total = `${brl(o.total)}${ent&&o.fee==null?" + taxa de entrega":""}`;
-  if(tipo==="confirmar") return `Olá, ${nome}! Aqui é da Iarla Ingrid 💛\nRecebemos seu pedido nº ${o.num}:\n${itens}\n\nTotal: ${total}\n${ent?`Entrega: ${o.address}${o.bairro?` – ${o.bairro}`:""}`:"Retirada na loja"}\nPara: ${quando}\nPagamento: ${o.pay}${o.troco?` (troco para ${o.troco})`:""}\n\nPosso confirmar?`;
+  const pp = pixPlanOf(o);
+  const pixTxt = pp ? `\n\nPix${pp.resto>0?" (sinal de 50% da encomenda)":""}: ${brl(pp.agora)}${pp.feeAberta?" + taxa":""}\nChave Pix (${DB.store?.pixType||"chave"}): ${pixKeyFmt()}\n${DB.store?.pixName||""}${pp.resto>0?`\nRestante na ${ent?"entrega":"retirada"}: ${brl(pp.resto)}`:""}\nÉ só mandar o comprovante aqui 😉` : "";
+  if(tipo==="confirmar") return `Olá, ${nome}! Aqui é da Iarla Ingrid 💛\nRecebemos seu pedido nº ${o.num}:\n${itens}\n\nTotal: ${total}\n${ent?`Entrega: ${o.address}${o.bairro?` – ${o.bairro}`:""}`:"Retirada na loja"}\nPara: ${quando}\nPagamento: ${o.pay}${o.troco?` (troco para ${o.troco})`:""}${pixTxt}\n\nPosso confirmar?`;
   if(tipo==="confirmado") return `Pedido nº ${o.num} confirmado, ${nome}! 🎂\n${ent?"Entregamos":"Fica pronto para retirada"} ${quando}. Qualquer coisa, é só chamar aqui.`;
   if(tipo==="saiu") return `Oi, ${nome}! Seu pedido nº ${o.num} saiu para entrega 🛵 Já já chega aí!`;
   if(tipo==="pronto") return `Oi, ${nome}! Seu pedido nº ${o.num} está pronto para retirada 💛\nEndereço: ${DB.store?.address||"Rua Vicente Ferreira da Ponte, 369 · COHAB 1"}`;
