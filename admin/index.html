@@ -201,9 +201,11 @@ select.in{background-image:linear-gradient(45deg,transparent 50%,currentColor 50
 .stock{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface-2)}
 .stock button{width:40px;height:40px;border:0;background:none;font-size:20px;font-weight:700;color:var(--brown);cursor:pointer}
 .stock output{min-width:34px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
-.stockbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface-2);cursor:pointer;justify-self:start;font-size:14px;max-width:100%}
+.stockbtn{display:inline-flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:1px;min-height:40px;padding:6px 12px;text-align:left;border-radius:12px;border:1.5px solid var(--line);background:var(--surface-2);cursor:pointer;justify-self:start;font-size:14px;max-width:100%}
 .stockbtn .k{color:var(--ink-soft);font-weight:600;font-size:12.5px}
 .stockbtn b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.stockbtn .sub{flex-basis:100%;font-size:12px;color:var(--ink-soft);font-weight:600}
+.stockbtn.enc{background:var(--caramel-bg);border-color:transparent}.stockbtn.enc b{color:var(--caramel)}
 .stockbtn svg.i{width:15px;height:15px;color:var(--ink-soft)}
 .stockbtn:hover{border-color:var(--brown)}
 .stockbtn.on{background:var(--ok-bg);border-color:transparent}.stockbtn.on b{color:var(--ok)}
@@ -577,7 +579,7 @@ function renderHome(){
       </section>
       <div style="display:grid;gap:16px">
         <section class="card"><h2>Estoque</h2>
-          ${low.length?`<div class="alerts">${low.map(p=>`<button class="alert" type="button" data-edit="${p.id}"><img src="${esc(imgSrc(p.img))}" alt=""><span class="t">${esc(p.name)}<small>${p.soldOut||p.stock===0?"Esgotado":`Restam ${p.stock}`}</small></span><span class="pill ${p.soldOut||p.stock===0?"p-esgotado":"p-baixo"}">${p.soldOut||p.stock===0?"Esgotado":"Baixo"}</span></button>`).join("")}</div>`:`<p class="muted">Tudo certo com o estoque.</p>`}
+          ${low.length?`<div class="alerts">${low.map(p=>`<button class="alert" type="button" data-edit="${p.id}"><img src="${esc(imgSrc(p.img))}" alt=""><span class="t">${esc(p.name)}<small>${p.soldOut?"Esgotado":p.stock===0?(p.encZero?"Zerou · agora sob encomenda":"Esgotado"):`Restam ${p.stock}`}</small></span><span class="pill ${p.soldOut||(p.stock===0&&!p.encZero)?"p-esgotado":"p-baixo"}">${p.soldOut||(p.stock===0&&!p.encZero)?"Esgotado":p.stock===0?"Encomenda":"Baixo"}</span></button>`).join("")}</div>`:`<p class="muted">Tudo certo com o estoque.</p>`}
         </section>
         <section class="card"><h2>Mais vendidos no mês</h2>
           ${top.length?`<ol class="top5">${top.map(([n,q])=>`<li><span>${esc(n)}</span><b>${q}</b><span class="bar"><i style="width:${Math.round(q/max*100)}%"></i></span></li>`).join("")}</ol>`:`<p class="muted">Ainda sem vendas neste mês.</p>`}
@@ -654,14 +656,18 @@ function openOrder(id){
 /* ================= CARDÁPIO ================= */
 let catSel = null;
 function prodRow(p, i, n){
-  const status = !p.active?'<span class="pill p-oculto">Oculto</span>': p.soldOut||(p.stockOn&&p.stock===0)?'<span class="pill p-esgotado">Esgotado</span>': "";
+  const status = !p.active?'<span class="pill p-oculto">Oculto</span>': p.soldOut||(p.stockOn&&p.stock===0&&!p.encZero)?'<span class="pill p-esgotado">Esgotado</span>': "";
+  const zeroEnc = p.stockOn && p.stock===0 && p.encZero;
+  const sk = !p.stockOn ? ["", "Encomenda", "Sem limite", ""]
+    : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.stock===1?" unidade":" unidades"),
+       p.encZero?"Ao zerar: vira encomenda":"Ao zerar: esgota"];
   const price = p.sizes?.length ? `a partir de ${brl(Math.min(...p.sizes.map(s=>s[1])))}` : brl(p.price);
   return `<article class="prod${p.active?"":" is-hidden"}" data-pid="${p.id}" draggable="true">
     <div class="order-ctl"><button type="button" class="grip" aria-label="Arrastar para reordenar" tabindex="-1">${ic("grip")}</button><button type="button" data-mv="-1" aria-label="Subir ${esc(p.name)}" ${i===0?"disabled":""}>${ic("up")}</button><button type="button" data-mv="1" aria-label="Descer ${esc(p.name)}" ${i===n-1?"disabled":""}>${ic("down")}</button></div>
     <div class="ph"><img src="${esc(imgSrc(p.img))}" alt="" loading="lazy" style="object-position:${esc(p.pos)}"></div>
     <div class="info"><span class="name">${esc(p.name)}</span><span class="meta"><span class="price">${price}</span>${status}${p.featured?'<span class="pill p-ok">Mais pedido</span>':""}</span>
-      <button type="button" class="stockbtn${p.stockOn?(p.stock===0?" zero":p.stock<=3?" low":" on"):""}" data-qs aria-label="Estoque de ${esc(p.name)}: ${p.stockOn?p.stock+" unidades":"sem limite"}. Toque para alterar">
-        <span class="k">Estoque</span><b>${p.stockOn?(p.stock===0?"0 · esgotado":p.stock+(p.stock===1?" unidade":" unidades")):"Sem limite"}</b>${ic("edit")}
+      <button type="button" class="stockbtn${sk[0]}" data-qs aria-label="Estoque de ${esc(p.name)}: ${sk[1]}, ${sk[2]}. ${sk[3]}. Toque para alterar">
+        <span class="k">${sk[1]}</span><b>${sk[2]}</b>${ic("edit")}${sk[3]?`<span class="sub">${sk[3]}</span>`:""}
       </button>
     </div>
     <div class="acts">

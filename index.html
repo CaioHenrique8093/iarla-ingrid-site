@@ -399,6 +399,9 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .info.bad{color:#B3261E;background:#FBE4E2}
 .info.ok{color:#1E6B3A;background:#E1F3E7}
 .pronta-note{margin:0 0 18px}
+.pronta-note .lines{display:grid;gap:6px}
+.pronta-note .lines p{margin:0;display:flex;gap:8px;align-items:flex-start}
+.pronta-note .lines svg{width:18px;height:18px;flex:none;margin-top:1px}
 .pronta-note a{color:inherit;font-weight:700}
 #whenNotice a{color:inherit;font-weight:700}
 .add:disabled{background:var(--line);border-color:var(--line);color:var(--ink-soft);cursor:not-allowed;transform:none}
@@ -513,8 +516,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       </div>
       <p class="loading" id="loading">Carregando cardápio…</p>
       <div class="notice pronta-note" id="prontaNote" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <span>Itens marcados <strong>Pronta-entrega</strong> saem no mesmo dia, para entrega ou retirada das <strong>13:30 às 18:30</strong>. Precisa pela manhã? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a> para ver a disponibilidade.</span>
+        <div class="lines">
+          <p id="noteP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><strong>Pronta-entrega:</strong> sai no mesmo dia, para entrega ou retirada das <strong>13:30 às 18:30</strong>. Precisa pela manhã? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a>.</span></p>
+          <p id="noteE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M4 16c2 1 3 1 4 0s3-1 4 0 3 1 4 0 3-1 4 0M12 12V8M12 5.5v-.01"/></svg><span id="noteETxt"></span></p>
+        </div>
       </div>
 
       <nav class="cats" aria-label="Categorias do cardápio">
@@ -884,7 +889,10 @@ function renderMenu(){
   // remove do carrinho o que não existe mais
   for(let i=cart.length-1;i>=0;i--) if(!byId[cart[i].pid] || byId[cart[i].pid].soldOut) cart.splice(i,1);
   cart.forEach(c=>{ if(!c.kind) c.kind = itemKind(byId[c.pid]); });
-  $("prontaNote").hidden = !Object.values(byId).some(it=>!it.soldOut && itemKind(it)==="pronta");
+  const vis = Object.values(byId).filter(it=>!it.soldOut), temP = vis.some(it=>itemKind(it)==="pronta"), temE = vis.some(it=>itemKind(it)==="enc");
+  const ant = STORE.antecedencia_dias||0;
+  $("noteETxt").innerHTML = `<strong>Encomenda:</strong> feita especialmente para você${ant?`, com <strong>${ant} dia${ant>1?"s":""} de antecedência</strong>`:""}.${STORE.pagamentos&&STORE.pagamentos["Pix"]?" No Pix, você paga 50% de sinal e o restante na entrega ou retirada.":""}`;
+  $("noteP").hidden = !temP; $("noteE").hidden = !temE; $("prontaNote").hidden = !(temP||temE);
 }
 $("groups").addEventListener("change", e=>{
   const card = e.target.closest(".card"); if(!card) return;
