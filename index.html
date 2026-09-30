@@ -517,7 +517,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <p class="loading" id="loading">Carregando cardápio…</p>
       <div class="notice pronta-note" id="prontaNote" hidden>
         <div class="lines">
-          <p id="noteP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span><strong>Pedido para o mesmo dia (Pronta-entrega)?</strong> Realizamos entrega ou retirada das <strong>13:30 às 18:30h</strong>.<br>Precisa pela manhã? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a> para verificarmos a disponibilidade.</span></p>
+          <p id="noteP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h6.5l2-5h-4l-2-3H8M15 6h3l2 6M3 12h5l2 5"/></svg><span><strong>Pedidos para o mesmo dia? Pronta-entrega das 13:30 às 18:30h</strong><br>Faça seu pedido pelo cardápio e escolha o horário que deseja entre 13:30 e 18:30h.<br>Tempo estimado de entrega: <strong>40 a 90 minutos</strong>.<br>Precisa em outro horário no mesmo dia? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a> para verificar a disponibilidade.</span></p>
           <p id="noteE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M4 16c2 1 3 1 4 0s3-1 4 0 3 1 4 0 3-1 4 0M12 12V8M12 5.5v-.01"/></svg><span id="noteETxt"></span></p>
         </div>
       </div>
@@ -891,7 +891,7 @@ function renderMenu(){
   cart.forEach(c=>{ if(!c.kind) c.kind = itemKind(byId[c.pid]); });
   const vis = Object.values(byId).filter(it=>!it.soldOut), temP = vis.some(it=>itemKind(it)==="pronta"), temE = vis.some(it=>itemKind(it)==="enc");
   const ant = STORE.antecedencia_dias||0;
-  $("noteETxt").innerHTML = `<strong>Encomenda:</strong> feita especialmente para você${ant?`, com <strong>${ant} dia${ant>1?"s":""} de antecedência</strong>`:""}.${STORE.pagamentos&&STORE.pagamentos["Pix"]?"<br>No Pix, você paga 50% de sinal e o restante na entrega ou retirada.":""}`;
+  $("noteETxt").innerHTML = `<strong>Encomendas${ant?`: com ${ant} dia${ant>1?"s":""} de antecedência`:""}</strong><br>Para confirmar, pague <strong>50% do valor</strong> no Pix e envie o comprovante no nosso WhatsApp.`;
   $("noteP").hidden = !temP; $("noteE").hidden = !temE; $("prontaNote").hidden = !(temP||temE);
 }
 $("groups").addEventListener("change", e=>{
@@ -955,7 +955,9 @@ function bairroInfo(){
   return b ? {fee:+b.taxa, name:b.nome, known:true, id:b.id} : {fee:null, name:"", known:false};
 }
 const subtotal = () => cart.reduce((a,c)=>a+c.qty*c.price,0);
-/* Pix: encomenda paga 50% agora; pronta-entrega paga 100%; a taxa de entrega vai junto no Pix. */
+/* Pix: encomenda sempre paga 50% de sinal no Pix (o resto na forma escolhida);
+   pronta-entrega paga 100% no Pix quando o cliente escolhe Pix; a taxa de entrega vai junto no Pix. */
+function usaPix(){ return cart.length>0 && (pag()==="Pix" || cartKind()==="enc"); }
 const cents = v => Math.round(v*100)/100;
 function pixPlan(){
   const b = bairroInfo(), ent = modo()==="entrega";
@@ -1007,19 +1009,19 @@ function updateTotals(){
   $("bairroOutro").hidden = !(b.outro);
   $("trocoBox").hidden = pag()!=="Dinheiro";
   setWhen();
-  const isPix = pag()==="Pix" && cart.length, pp = pixPlan();
+  const isPix = usaPix(), pp = pixPlan();
   $("pixNowRow").hidden = !isPix; $("pixRestRow").hidden = !isPix || !(pp.resto>0);
   $("pixHint").hidden = !isPix;
   if(isPix){
-    $("pixNowLbl").textContent = pp.resto>0 ? "Pagar agora no Pix (sinal)" : "Pagar agora no Pix";
+    $("pixNowLbl").textContent = pp.resto>0 ? "Sinal agora no Pix (50%)" : "Pagar agora no Pix";
     $("pixNowVal").textContent = brl(pp.agora) + (pp.feeAberta?" + taxa":"");
-    $("pixRestLbl").textContent = `Restante na ${ent?"entrega":"retirada"}`;
+    $("pixRestLbl").textContent = `Restante na ${ent?"entrega":"retirada"}${pag()&&pag()!=="Pix"?` (${pag().toLowerCase()})`:""}`;
     $("pixRestVal").textContent = brl(pp.resto);
     const onde = ent ? "entrega" : "retirada";
     $("pixHintTxt").textContent = (pp.enc>0 && pp.pronta>0)
       ? `Encomendas pagam 50% agora no Pix e o restante na ${onde}. Itens de pronta-entrega são pagos por inteiro. A chave Pix aparece ao confirmar.`
       : pp.enc>0
-      ? `Encomenda: você paga 50% agora no Pix e o restante na ${onde}. A chave Pix aparece ao confirmar.`
+      ? `Encomenda: para confirmar, pague 50% de sinal no Pix e envie o comprovante no WhatsApp. O restante você paga na ${onde}${pag()!=="Pix"?` (${pag().toLowerCase()})`:""}. A chave Pix aparece ao confirmar.`
       : "Pagamento total no Pix. A chave aparece ao confirmar o pedido.";
   }
   $("preview").textContent = buildMessage();
@@ -1071,7 +1073,7 @@ const waLink = text => `https://wa.me/${STORE.whatsapp}${text?`?text=${encodeURI
 
 /* pronta-entrega: no mesmo dia, das 13:30 às 18:30 (manhã só combinando no WhatsApp) */
 const PRONTA = { de:"13:30", ate:"18:30" };
-const MANHA_MSG = "Olá! Preciso de um pedido para hoje pela manhã. Tem disponibilidade?";
+const MANHA_MSG = "Olá! Preciso de um pedido para hoje fora do horário das 13:30 às 18:30. Tem disponibilidade?";
 function dayOpen(d){ const h = STORE.horarios[dow(d)]; return !FECH.includes(d) && h && h.aberto; }
 function prontaMinDate(){
   const n = nowSobral(); let d = n.date;
@@ -1083,12 +1085,12 @@ function setWhen(){
   const k = cartKind(), n = nowSobral(), box = $("whenNotice");
   if(k==="pronta"){
     $("data").min = prontaMinDate(); $("hora").min = PRONTA.de; $("hora").max = PRONTA.ate;
-    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>13:30 às 18:30</strong>. Escolha o horário nessa faixa. Precisa pela manhã? <a href="${waLink(MANHA_MSG)}" target="_blank" rel="noopener">Fale com a gente no WhatsApp</a> para ver a disponibilidade.`;
+    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>13:30 às 18:30</strong>. Tempo estimado de entrega: 40 a 90 minutos. Precisa em outro horário hoje? <a href="${waLink(MANHA_MSG)}" target="_blank" rel="noopener">Fale com a gente no WhatsApp</a> para verificar a disponibilidade.`;
     box.hidden = false;
   } else {
     $("data").min = addDays(n.date, STORE.antecedencia_dias||0); $("hora").min = "08:00"; $("hora").max = "18:00";
     const ant = STORE.antecedencia_dias||0;
-    $("whenTxt").innerHTML = ant ? `<strong>Encomenda:</strong> precisa de ${ant} dia(s) de antecedência.` : "";
+    $("whenTxt").innerHTML = ant ? `<strong>Encomenda:</strong> com ${ant} dia${ant>1?"s":""} de antecedência.` : "";
     box.hidden = !(k && ant);
   }
 }
@@ -1134,7 +1136,7 @@ function payload(){
 }
 function finish(num){
   const fone = $("whats").value.trim();
-  const pix = pag()==="Pix" ? Object.assign(pixPlan(), {modo:modo()}) : null;
+  const pix = usaPix() ? Object.assign(pixPlan(), {modo:modo(), pag:pag()}) : null;
   try{ localStorage.setItem("ii-last", JSON.stringify({num, fone, pix, at:Date.now()})); }catch(e){}
   cart.length = 0; saveCart(); renderBar(false); renderOrder();
   history.replaceState(null, "", "#pedido"); route();
@@ -1162,7 +1164,7 @@ function showDone(num, fone, link, pix){
     if(pix){
       $("doneText").textContent = `A loja já recebeu o seu pedido. Faça o Pix abaixo e envie o comprovante. A Iarla confirma com você pelo WhatsApp${fone?`, no número ${fone}`:""}.`;
       $("pixVal").textContent = brl(pix.agora) + (pix.feeAberta?" + taxa":"");
-      $("pixValSub").textContent = pix.resto>0 ? `Sinal de 50% da encomenda. Restante de ${brl(pix.resto)} na ${pix.modo==="entrega"?"entrega":"retirada"}.` : "Valor total do pedido.";
+      $("pixValSub").textContent = pix.resto>0 ? `Sinal de 50% da encomenda. Restante de ${brl(pix.resto)} na ${pix.modo==="entrega"?"entrega":"retirada"}${pix.pag&&pix.pag!=="Pix"?` (${pix.pag.toLowerCase()})`:""}.` : "Valor total do pedido.";
       $("pixKeyLbl").textContent = `Chave Pix (${STORE.pix_tipo||"chave"})`;
       $("pixKey").textContent = fmtPixKey(STORE.chave_pix, STORE.pix_tipo);
       $("pixName").textContent = STORE.pix_titular || "";

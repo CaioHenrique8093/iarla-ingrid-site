@@ -1173,7 +1173,7 @@ function afterOrders(){ renderAlert(); autoPrint(); }
 
 /* ---------- Pix: encomenda (sem limite de estoque) paga 50%; pronta-entrega 100%; taxa junto ---------- */
 function pixPlanOf(o){
-  if(o.pay!=="Pix") return null;
+  if(o.pay!=="Pix" && o.kind!=="enc") return null;   // encomenda: sinal sempre no Pix
   let enc = 0, pronta = 0;
   if(o.kind) o.items.forEach(i=>{ const v = i.qty*i.price; if(o.kind==="pronta") pronta += v; else enc += v; });
   else o.items.forEach(i=>{ const p = DB.products.find(x=>x.id===i.pid), v = i.qty*i.price; if(p && p.stockOn) pronta += v; else enc += v; });
@@ -1236,9 +1236,9 @@ function comandaHTML(o){
     ${row("TOTAL", brl(o.total)+(ent&&o.fee==null?" + taxa":""), true)}
     ${(()=>{ const pp = pixPlanOf(o), onde = ent ? "NA ENTREGA" : "NA RETIRADA";
       if(pp) return `<div style="border:2px solid #000;border-radius:4px;padding:5px 6px;margin-top:6px;text-align:center">
-        <div style="font-size:14px;font-weight:900">PAGAMENTO: PIX</div>
+        <div style="font-size:14px;font-weight:900">PAGAMENTO: ${o.pay==="Pix"?"PIX":"SINAL NO PIX + "+esc(String(o.pay||"").toUpperCase())}</div>
         <div style="font-size:13px">${pp.resto>0?"Sinal":"Valor"} no Pix: ${brl(pp.agora)}${pp.feeAberta?" + taxa":""} (conferir comprovante)</div>
-        ${pp.resto>0?`<div style="font-size:16px;font-weight:900;margin-top:3px">RECEBER ${onde}: ${brl(pp.resto)}</div>`:`<div style="font-size:14px;font-weight:900;margin-top:3px">NADA A RECEBER ${onde}</div>`}
+        ${pp.resto>0?`<div style="font-size:16px;font-weight:900;margin-top:3px">RECEBER ${onde}: ${brl(pp.resto)}${o.pay!=="Pix"?` (${esc(String(o.pay||"").toUpperCase())})`:""}</div>${o.troco?`<div style="font-size:13px">Troco para ${esc(o.troco)}</div>`:""}`:`<div style="font-size:14px;font-weight:900;margin-top:3px">NADA A RECEBER ${onde}</div>`}
       </div>`;
       return `<div style="border:2px solid #000;border-radius:4px;padding:5px 6px;margin-top:6px;text-align:center">
         <div style="font-size:14px;font-weight:900">PAGAMENTO: ${esc(String(o.pay||"").toUpperCase())}</div>
@@ -1437,7 +1437,7 @@ function waText(o, tipo){
   const quando = `${fmtDate(o.date)}${o.time?` às ${o.time}`:""}`;
   const total = `${brl(o.total)}${ent&&o.fee==null?" + taxa de entrega":""}`;
   const pp = pixPlanOf(o);
-  const pixTxt = pp ? `\n\nPix${pp.resto>0?" (sinal de 50% da encomenda)":""}: ${brl(pp.agora)}${pp.feeAberta?" + taxa":""}\nChave Pix (${DB.store?.pixType||"chave"}): ${pixKeyFmt()}\n${DB.store?.pixName||""}${pp.resto>0?`\nRestante na ${ent?"entrega":"retirada"}: ${brl(pp.resto)}`:""}\nÉ só mandar o comprovante aqui 😉` : "";
+  const pixTxt = pp ? `\n\nPix${pp.resto>0?" (sinal de 50% da encomenda)":""}: ${brl(pp.agora)}${pp.feeAberta?" + taxa":""}\nChave Pix (${DB.store?.pixType||"chave"}): ${pixKeyFmt()}\n${DB.store?.pixName||""}${pp.resto>0?`\nRestante na ${ent?"entrega":"retirada"}${o.pay!=="Pix"?` (${o.pay})`:""}: ${brl(pp.resto)}`:""}\nÉ só mandar o comprovante aqui 😉` : "";
   if(tipo==="confirmar") return `Olá, ${nome}! Aqui é da Iarla Ingrid 💛\nRecebemos seu pedido nº ${o.num}:\n${itens}\n\nTotal: ${total}\n${ent?`Entrega: ${o.address}${o.bairro?` – ${o.bairro}`:""}`:"Retirada na loja"}\nPara: ${quando}\nPagamento: ${o.pay}${o.troco?` (troco para ${o.troco})`:""}${pixTxt}\n\nPosso confirmar?`;
   if(tipo==="confirmado") return `Pedido nº ${o.num} confirmado, ${nome}! 🎂\n${ent?"Entregamos":"Fica pronto para retirada"} ${quando}. Qualquer coisa, é só chamar aqui.`;
   if(tipo==="saiu") return `Oi, ${nome}! Seu pedido nº ${o.num} saiu para entrega 🛵 Já já chega aí!`;
