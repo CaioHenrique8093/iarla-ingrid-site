@@ -397,6 +397,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .combo.off .ph img{filter:grayscale(.7);opacity:.7}
 .info.warn{color:#A15C07;background:#FCEFD8}
 .info.bad{color:#B3261E;background:#FBE4E2}
+.info.ok{color:#1E6B3A;background:#E1F3E7}
+.pronta-note{margin:0 0 18px}
+.pronta-note a{color:inherit;font-weight:700}
+#whenNotice a{color:inherit;font-weight:700}
 .add:disabled{background:var(--line);border-color:var(--line);color:var(--ink-soft);cursor:not-allowed;transform:none}
 .opt input:disabled + label{opacity:.45;text-decoration:line-through;cursor:not-allowed}
 .stockmsg{font-size:13px;color:#B3261E;font-weight:600;margin:0}
@@ -420,7 +424,8 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .pixbox .btn svg{width:20px;height:20px;flex:none}
 .totals .row.pixnow{margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-weight:700;color:var(--brown)}
 .totals .row.pixrest{font-size:14px;color:var(--ink-soft)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .info.warn{color:#F0B35A;background:#3A2A12}:root:not([data-theme="light"]) .info.bad{color:#F2877F;background:#3B1A18}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .info.warn{color:#F0B35A;background:#3A2A12}:root:not([data-theme="light"]) .info.bad{color:#F2877F;background:#3B1A18}:root:not([data-theme="light"]) .info.ok{color:#8FD3A6;background:#16301F}}
+:root[data-theme="dark"] .info.ok{color:#8FD3A6;background:#16301F}
 </style>
 </head>
 <body>
@@ -507,6 +512,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
         <p>Toque em <strong>Adicionar</strong> nos itens que quiser. No final, você revisa e confirma o pedido aqui mesmo.</p>
       </div>
       <p class="loading" id="loading">Carregando cardápio…</p>
+      <div class="notice pronta-note" id="prontaNote" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>Itens marcados <strong>Pronta-entrega</strong> saem no mesmo dia, para entrega ou retirada das <strong>13:30 às 18:30</strong>. Precisa pela manhã? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a> para ver a disponibilidade.</span>
+      </div>
 
       <nav class="cats" aria-label="Categorias do cardápio">
         <div class="cats-inner" id="cats"></div>
@@ -611,6 +620,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
                 <label for="hora">Horário</label>
                 <input type="time" id="hora" name="hora" min="08:00" max="18:00">
               </div>
+            </div>
+            <div class="notice" id="whenNotice" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span id="whenTxt"></span>
             </div>
 
             <div class="fld">
@@ -782,7 +795,8 @@ async function loadData(){
       id:x.id, name:x.nome, img:x.foto_url||"img/logo.svg", pos:x.foto_pos||"50% 50%", desc:x.descricao, serve:x.porcao,
       price:+x.preco, flavors:x.sabores||[], askFlavor:x.sabor_a_combinar,
       sizes:(x.tamanhos||[]).map(t=>[+t.qtd,+t.preco]), list:x.itens_combo||[], featured:x.destaque,
-      soldOut: x.esgotado || (x.estoque_ativo && x.estoque<=0), stock: x.estoque_ativo ? x.estoque : null, combo:cat.is_combo
+      encZero: !!x.encomenda_ao_zerar,
+      soldOut: x.esgotado || (x.estoque_ativo && x.estoque<=0 && !x.encomenda_ao_zerar), stock: x.estoque_ativo ? x.estoque : null, combo:cat.is_combo
     }));
     const allRefri = cat.is_combo && items.length && items.every(i=>i.list.some(l=>/refrigerante/i.test(l)));
     return {id:cat.id, title:cat.nome, tag:cat.subtitulo, combo:cat.is_combo, note: allRefri?"Todos os combos já vêm com refrigerante 2L.":"", items};
@@ -800,17 +814,22 @@ function optGroup(item, key, legend, values, disabled=[]){
   }).join("")}</div></fieldset>`;
 }
 function unitsInCart(pid){ return cart.filter(c=>c.pid===pid).reduce((a,c)=>a+c.units*c.qty,0); }
-function stockLeft(it){ return it.stock==null ? Infinity : Math.max(0, it.stock - unitsInCart(it.id)); }
+/* "pronta" = tem estoque (sai no mesmo dia, 13:30–18:30); "enc" = sob encomenda
+   (sem limite de estoque, ou estoque zerado com "aceitar encomenda ao zerar") */
+function itemKind(it){ return it.stock!=null && it.stock>0 ? "pronta" : "enc"; }
+function stockLeft(it){ return itemKind(it)==="pronta" ? Math.max(0, it.stock - unitsInCart(it.id)) : Infinity; }
+function cartKind(){ return cart.length ? (cart[0].kind||"enc") : null; }
 function stockChip(it){
   if(it.soldOut) return `<span class="info bad">Esgotado</span>`;
-  if(it.stock!=null && it.stock<=5) return `<span class="info warn">Restam ${it.stock}${it.sizes.length?" un.":""}</span>`;
+  if(itemKind(it)==="pronta") return `<span class="info ok">Pronta-entrega</span>` + (it.stock<=5 ? `<span class="info warn">Restam ${it.stock}${it.sizes.length?" un.":""}</span>` : "");
+  if(it.stock!=null && it.encZero) return `<span class="info">Sob encomenda</span>`;
   return "";
 }
 function cardHTML(item){
   let opts = "", price;
   if(item.flavors.length>1) opts += optGroup(item,"sabor","Sabor",item.flavors.map(esc));
   if(item.sizes.length){
-    const dis = item.sizes.map(([q])=>item.stock!=null && q>item.stock);
+    const dis = item.sizes.map(([q])=>itemKind(item)==="pronta" && q>item.stock);
     opts += optGroup(item,"qtd","Quantidade",item.sizes.map(([q,p])=>`${q} un. <b>${brl(p)}</b>`),dis);
     const first = Math.max(0, dis.findIndex(d=>!d));
     price = `<span class="price" data-price>${brl(item.sizes[first][1])}</span>`;
@@ -864,6 +883,8 @@ function renderMenu(){
   document.querySelectorAll(".group").forEach(g=>io.observe(g));
   // remove do carrinho o que não existe mais
   for(let i=cart.length-1;i>=0;i--) if(!byId[cart[i].pid] || byId[cart[i].pid].soldOut) cart.splice(i,1);
+  cart.forEach(c=>{ if(!c.kind) c.kind = itemKind(byId[c.pid]); });
+  $("prontaNote").hidden = !Object.values(byId).some(it=>!it.soldOut && itemKind(it)==="pronta");
 }
 $("groups").addEventListener("change", e=>{
   const card = e.target.closest(".card"); if(!card) return;
@@ -886,10 +907,16 @@ function addToCart(id, card){
     if(q){ size = +q.value; const [n,p] = it.sizes[size]; label += ` (${n} un.)`; price = p; units = n; }
     if(it.serve && it.serve!=="Individual") detail.unshift(it.serve.toLowerCase());
   }
-  if(stockLeft(it) < units){ stockMsg(card, it.stock - unitsInCart(it.id) <= 0 ? "Você já adicionou todo o estoque disponível." : `Só restam ${stockLeft(it)} unidade(s).`); return false; }
+  const kind = itemKind(it), ck = cartKind();
+  if(ck && ck!==kind){ stockMsg(card, ck==="pronta"
+    ? "Seu pedido tem itens de pronta-entrega. Encomendas vão em um pedido separado."
+    : "Seu pedido é de encomenda. Itens de pronta-entrega vão em um pedido separado."); return false; }
+  if(stockLeft(it) < units){ stockMsg(card, it.encZero
+    ? `Só temos ${it.stock} a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.`
+    : (it.stock - unitsInCart(it.id) <= 0 ? "Você já adicionou todo o estoque disponível." : `Só restam ${stockLeft(it)} unidade(s).`)); return false; }
   const key = id+"|"+size+"|"+(sabor||"");
   const found = cart.find(c=>c.key===key);
-  if(found) found.qty++; else cart.push({key,pid:id,size,sabor,label,detail,price,units,qty:1});
+  if(found) found.qty++; else cart.push({key,pid:id,size,sabor,label,detail,price,units,qty:1,kind});
   refresh(); return true;
 }
 function renderBar(bump){
@@ -920,13 +947,12 @@ function bairroInfo(){
   return b ? {fee:+b.taxa, name:b.nome, known:true, id:b.id} : {fee:null, name:"", known:false};
 }
 const subtotal = () => cart.reduce((a,c)=>a+c.qty*c.price,0);
-/* Pix: encomenda (produto sem limite de estoque) paga 50% agora;
-   pronta-entrega (estoque limitado) paga 100%; a taxa de entrega vai junto no Pix. */
+/* Pix: encomenda paga 50% agora; pronta-entrega paga 100%; a taxa de entrega vai junto no Pix. */
 const cents = v => Math.round(v*100)/100;
 function pixPlan(){
   const b = bairroInfo(), ent = modo()==="entrega";
   let enc = 0, pronta = 0;
-  cart.forEach(c=>{ const it = byId[c.pid], v = c.qty*c.price; if(it && it.stock!=null) pronta += v; else enc += v; });
+  cart.forEach(c=>{ const v = c.qty*c.price; if(c.kind==="pronta") pronta += v; else enc += v; });
   const fee = ent && b.known ? (b.fee||0) : 0;
   const agora = cents(pronta + enc/2 + fee), resto = cents(enc/2);
   return { agora, resto, total: cents(pronta+enc+fee), enc: cents(enc), pronta: cents(pronta), feeAberta: ent && !b.known };
@@ -972,6 +998,7 @@ function updateTotals(){
   $("totalVal").textContent = brl(sub + (ent&&b.known?b.fee:0));
   $("bairroOutro").hidden = !(b.outro);
   $("trocoBox").hidden = pag()!=="Dinheiro";
+  setWhen();
   const isPix = pag()==="Pix" && cart.length, pp = pixPlan();
   $("pixNowRow").hidden = !isPix; $("pixRestRow").hidden = !isPix || !(pp.resto>0);
   $("pixHint").hidden = !isPix;
@@ -991,7 +1018,7 @@ function updateTotals(){
 }
 $("lines").addEventListener("click", e=>{
   const t = e.target.closest("button"); if(!t) return;
-  if(t.dataset.inc){ const c = cart[+t.dataset.inc], it = byId[c.pid]; if(it && stockLeft(it) < c.units) return flashErr(`Só restam ${it.stock} unidade(s) de ${it.name}.`); c.qty++; }
+  if(t.dataset.inc){ const c = cart[+t.dataset.inc], it = byId[c.pid]; if(it && stockLeft(it) < c.units) return flashErr(it.encZero ? `Só temos ${it.stock} de ${it.name} a pronta-entrega. Para mais, faça um pedido por encomenda separado.` : `Só restam ${it.stock} unidade(s) de ${it.name}.`); c.qty++; }
   if(t.dataset.dec){ const c = cart[+t.dataset.dec]; c.qty--; if(c.qty<1) cart.splice(+t.dataset.dec,1); }
   if(t.dataset.rm) cart.splice(+t.dataset.rm,1);
   refresh();
@@ -1026,6 +1053,7 @@ function buildMessage(num){
     if(v("ref")) L.push(`*Referência:* ${v("ref")}`);
   } else L.push("*Retirada na loja*");
   const quando = [fmtDate(v("data")), v("hora")?`às ${v("hora")}`:""].filter(Boolean).join(" ");
+  L.push(`*Tipo:* ${cartKind()==="pronta"?"Pronta-entrega":"Encomenda"}`);
   L.push(`*Para:* ${quando||"—"}`);
   L.push(`*Pagamento:* ${pag()}${pag()==="Dinheiro"&&v("troco")?` (troco para ${v("troco")})`:""}`);
   if(v("obs")) L.push(`*Obs.:* ${v("obs")}`);
@@ -1033,14 +1061,45 @@ function buildMessage(num){
 }
 const waLink = text => `https://wa.me/${STORE.whatsapp}${text?`?text=${encodeURIComponent(text)}`:""}`;
 
+/* pronta-entrega: no mesmo dia, das 13:30 às 18:30 (manhã só combinando no WhatsApp) */
+const PRONTA = { de:"13:30", ate:"18:30" };
+const MANHA_MSG = "Olá! Preciso de um pedido para hoje pela manhã. Tem disponibilidade?";
+function dayOpen(d){ const h = STORE.horarios[dow(d)]; return !FECH.includes(d) && h && h.aberto; }
+function prontaMinDate(){
+  const n = nowSobral(); let d = n.date;
+  if(n.time >= PRONTA.ate) d = addDays(d, 1);
+  for(let i=0; i<14 && !dayOpen(d); i++) d = addDays(d, 1);
+  return d;
+}
+function setWhen(){
+  const k = cartKind(), n = nowSobral(), box = $("whenNotice");
+  if(k==="pronta"){
+    $("data").min = prontaMinDate(); $("hora").min = PRONTA.de; $("hora").max = PRONTA.ate;
+    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>13:30 às 18:30</strong>. Escolha o horário nessa faixa. Precisa pela manhã? <a href="${waLink(MANHA_MSG)}" target="_blank" rel="noopener">Fale com a gente no WhatsApp</a> para ver a disponibilidade.`;
+    box.hidden = false;
+  } else {
+    $("data").min = addDays(n.date, STORE.antecedencia_dias||0); $("hora").min = "08:00"; $("hora").max = "18:00";
+    const ant = STORE.antecedencia_dias||0;
+    $("whenTxt").innerHTML = ant ? `<strong>Encomenda:</strong> precisa de ${ant} dia(s) de antecedência.` : "";
+    box.hidden = !(k && ant);
+  }
+}
 function scheduleError(){
   const d = $("data").value; if(!d) return "";
-  const hoje = nowSobral().date, min = addDays(hoje, STORE.antecedencia_dias||0);
+  const n = nowSobral(), hoje = n.date, t = $("hora").value;
+  if(cartKind()==="pronta"){
+    if(d < hoje) return "Escolha uma data a partir de hoje.";
+    if(d === hoje && n.time >= PRONTA.ate) return "A pronta-entrega de hoje vai até as 18:30. Escolha outro dia.";
+    if(!dayOpen(d)) return FECH.includes(d) ? "A loja estará fechada nessa data. Escolha outro dia." : `Não abrimos aos ${DIAS[dow(d)].toLowerCase()}s. Escolha outro dia.`;
+    if(t && (t < PRONTA.de || t > PRONTA.ate)) return "Pronta-entrega: escolha um horário das 13:30 às 18:30. Para a manhã, fale com a gente no WhatsApp.";
+    if(t && d === hoje && t <= n.time) return "Escolha um horário a partir de agora.";
+    return "";
+  }
+  const min = addDays(hoje, STORE.antecedencia_dias||0);
   if(d < min) return STORE.antecedencia_dias ? `Encomendas precisam de ${STORE.antecedencia_dias} dia(s) de antecedência.` : "Escolha uma data a partir de hoje.";
   if(FECH.includes(d)) return "A loja estará fechada nessa data. Escolha outro dia.";
   const h = STORE.horarios[dow(d)];
   if(!h || !h.aberto) return `Não abrimos aos ${DIAS[dow(d)].toLowerCase()}s. Escolha outro dia.`.replace("sábados","sábados");
-  const t = $("hora").value;
   if(t && (t < h.de || t > h.ate)) return `Nesse dia atendemos das ${hfmt(h.de)} às ${hfmt(h.ate)}.`;
   return "";
 }
@@ -1052,6 +1111,7 @@ function validate(){
   if(modo()==="entrega"){ const b=bairroInfo(); const bad = !b.known && !(b.outro && b.name.length>=2); $("f-bairro").classList.toggle("bad",bad); if(bad&&!first) first = b.outro?$("bairroOutro"):$("bairroSel"); }
   const err = $("formErr");
   if(!cart.length){ err.textContent = "Adicione pelo menos um item do cardápio."; err.classList.add("on"); return false; }
+  if(cart.some(c=>(c.kind||"enc")!==cartKind())){ err.textContent = "Pronta-entrega e encomenda vão em pedidos separados. Remova um dos tipos para continuar."; err.classList.add("on"); return false; }
   if(first){ err.textContent = "Preencha os campos marcados para enviar."; err.classList.add("on"); first.focus(); return false; }
   const se = scheduleError();
   if(se){ $("f-data").classList.add("bad"); $("f-data").querySelector(".err").textContent = se; err.textContent = se; err.classList.add("on"); $("data").focus(); return false; }
@@ -1061,7 +1121,7 @@ function validate(){
 function payload(){
   const v = id => $(id).value.trim(), b = bairroInfo();
   return { nome:v("nome"), whatsapp:v("whats"), modo:modo(), endereco:v("endereco"), bairro_id:b.id||null, bairro_texto:b.outro?b.name:"",
-    referencia:v("ref"), data:v("data"), horario:v("hora"), pagamento:pag(), troco:v("troco"), obs:v("obs"),
+    referencia:v("ref"), data:v("data"), horario:v("hora"), pagamento:pag(), troco:v("troco"), obs:v("obs"), tipo:cartKind()||"enc",
     itens: cart.map(c=>({produto_id:c.pid, qtd:c.qty, tamanho:c.size, sabor:c.sabor})) };
 }
 function finish(num){
@@ -1185,9 +1245,10 @@ function fillStore(){
   $("payOpts").innerHTML = pays.map((k,i)=>`<input type="radio" id="p-${i}" name="pag" value="${esc(k)}" ${(cur?k===cur:i===0)?"checked":""}><label for="p-${i}"><strong>${esc(k)}</strong></label>`).join("");
   if(!document.querySelector('input[name="pag"]:checked') && pays.length) document.querySelector('input[name="pag"]').checked = true;
   $("payOpts").style.gridTemplateColumns = `repeat(${Math.max(1,pays.length)},minmax(0,1fr))`;
-  // data mínima
-  $("data").min = addDays(n.date, STORE.antecedencia_dias||0);
+  // data mínima (pronta-entrega: hoje; encomenda: antecedência)
+  setWhen();
   $("data").max = addDays(n.date, 90);
+  document.querySelectorAll("[data-wa-manha]").forEach(a=>{ a.href = waLink(MANHA_MSG); a.target = "_blank"; a.rel = "noopener"; });
 }
 
 /* ---------- barra do pedido some no formulário ---------- */

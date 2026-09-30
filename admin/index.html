@@ -454,13 +454,13 @@ let DB = { categories:[], products:[], delivery:{on:true,outside:"combinar",bair
 const catFrom = r => ({id:r.id, name:r.nome, tag:r.subtitulo, active:r.ativo, combo:r.is_combo, ordem:r.ordem});
 const prodFrom = r => ({id:r.id, cat:r.categoria_id, name:r.nome, img:r.foto_url, pos:r.foto_pos||"50% 50%", desc:r.descricao, serve:r.porcao,
   price:+r.preco, flavors:r.sabores||[], askFlavor:r.sabor_a_combinar, sizes:(r.tamanhos||[]).map(t=>[+t.qtd,+t.preco]), items:r.itens_combo||[],
-  featured:r.destaque, active:r.ativo, soldOut:r.esgotado, stockOn:r.estoque_ativo, stock:r.estoque, ordem:r.ordem});
+  featured:r.destaque, active:r.ativo, soldOut:r.esgotado, stockOn:r.estoque_ativo, stock:r.estoque, encZero:!!r.encomenda_ao_zerar, ordem:r.ordem});
 const prodTo = p => ({categoria_id:p.cat, nome:p.name, descricao:p.desc||"", foto_url:p.img||"", foto_pos:p.pos||"50% 50%", porcao:p.serve||"",
   preco:+p.price||0, sabores:p.flavors||[], sabor_a_combinar:!!p.askFlavor, tamanhos:(p.sizes||[]).map(([q,pr])=>({qtd:q,preco:pr})), itens_combo:p.items||[],
-  destaque:!!p.featured, ativo:!!p.active, esgotado:!!p.soldOut, estoque_ativo:!!p.stockOn, estoque:+p.stock||0, ordem:p.ordem||0, atualizado_em:new Date().toISOString()});
+  destaque:!!p.featured, ativo:!!p.active, esgotado:!!p.soldOut, estoque_ativo:!!p.stockOn, estoque:+p.stock||0, ...(DB.encCol?{encomenda_ao_zerar:!!(p.stockOn&&p.encZero)}:{}), ordem:p.ordem||0, atualizado_em:new Date().toISOString()});
 const orderFrom = r => ({id:r.id, num:r.numero, printed:r.impresso_em||(typeof printedHere!=="undefined"&&printedHere.has(r.id)?new Date().toISOString():null), created:r.criado_em, name:r.cliente_nome, phone:r.cliente_whatsapp, mode:r.modo, bairro:r.bairro||"", address:r.endereco||"",
   ref:r.referencia||"", fee:r.taxa==null?null:+r.taxa, date:r.data_desejada, time:r.horario||"", pay:r.pagamento, troco:r.troco||"", obs:r.observacoes||"",
-  status:r.status, total:+r.total, sub:+r.subtotal, items:(r.pedido_itens||[]).map(i=>({pid:i.produto_id,label:i.nome,detail:i.detalhe,qty:i.qtd,price:+i.preco_unit}))});
+  kind:r.tipo||null, status:r.status, total:+r.total, sub:+r.subtotal, items:(r.pedido_itens||[]).map(i=>({pid:i.produto_id,label:i.nome,detail:i.detalhe,qty:i.qtd,price:+i.preco_unit}))});
 function storeFrom(c, f){
   return { whatsapp:fmtPhone(c.whatsapp), instagram:c.instagram, address:c.endereco, maps:c.maps_url,
     hours:c.horarios.map((h,i)=>({d:DIAS[i],open:h.aberto,from:h.de,to:h.ate})), closures:f.map(x=>({id:x.id,date:x.data,reason:x.motivo})),
@@ -471,7 +471,7 @@ function storeFrom(c, f){
 async function loadCatalog(){
   const [c,p] = await Promise.all([ SB.from("categorias").select("*").order("ordem"), SB.from("produtos").select("*").order("ordem") ]);
   if(c.error||p.error) throw (c.error||p.error);
-  DB.categories = c.data.map(catFrom); DB.products = p.data.map(prodFrom);
+  DB.categories = c.data.map(catFrom); DB.products = p.data.map(prodFrom); DB.encCol = !!p.data.length && ("encomenda_ao_zerar" in p.data[0]);
   if(!DB.categories.find(x=>x.id===catSel)) catSel = DB.categories[0]?.id;
 }
 async function loadStore(){
@@ -639,6 +639,7 @@ function openOrder(id){
       <dt>Cliente</dt><dd>${esc(o.name)}</dd>
       <dt>WhatsApp</dt><dd>${esc(fmtPhone(o.phone))}</dd>
       <dt>Receber</dt><dd>${o.mode==="entrega"?`Entrega · ${esc(o.address)} – ${esc(o.bairro)}${o.ref?` (ref.: ${esc(o.ref)})`:""}`:"Retirada na loja"}</dd>
+      ${o.kind?`<dt>Tipo</dt><dd>${o.kind==="pronta"?"Pronta-entrega":"Encomenda"}</dd>`:""}
       <dt>Para</dt><dd>${fmtDate(o.date)}${o.time?` às ${esc(o.time)}`:""}</dd>
       <dt>Pagamento</dt><dd>${esc(o.pay)}${o.troco?` · troco para ${esc(o.troco)}`:""}${(()=>{ const pp = pixPlanOf(o); return pp ? `<br><span class="muted small">No Pix: <b>${brl(pp.agora)}</b>${pp.feeAberta?" + taxa":""}${pp.resto>0?` · restante ${brl(pp.resto)} na ${o.mode==="entrega"?"entrega":"retirada"}`:""}</span>` : ""; })()}</dd>
       ${o.obs?`<dt>Obs.</dt><dd>${esc(o.obs)}</dd>`:""}
@@ -726,24 +727,25 @@ function stockFields(d){
     <div id="stkBox" class="row wrapx" ${d.stockOn?"":"hidden"}>
       <span class="stock"><button type="button" data-s="-1" aria-label="Diminuir">−</button><input class="stk-in" id="f-stock" type="number" inputmode="numeric" min="0" value="${d.stock||0}" aria-label="Quantidade disponível"><button type="button" data-s="1" aria-label="Aumentar">+</button></span>
       <span class="muted small">${unit} disponíveis</span>
+      ${DB.encCol?`<label class="row" style="gap:10px;flex-basis:100%;cursor:pointer"><input type="checkbox" id="f-enc0" ${d.encZero?"checked":""} style="width:20px;height:20px;accent-color:var(--brown)"><span><b>Quando zerar, aceitar por encomenda</b><br><span class="muted small">Em vez de “Esgotado”, o site passa a vender sob encomenda.</span></span></label>`:""}
     </div>
-    <span class="hint small muted">Com quantidade, o site mostra “Restam X”, não deixa pedir mais do que tem e marca “Esgotado” ao zerar. Cancelou um pedido? O estoque volta sozinho.</span>
+    <span class="hint small muted">Com quantidade, o site mostra “Pronta-entrega” e “Restam X” (entrega no mesmo dia, 13:30 às 18:30) e não deixa pedir mais do que tem. Ao zerar: “Esgotado”, ou encomenda se marcado acima. Cancelou um pedido? O estoque volta sozinho.</span>
   </div>`;
 }
 function bindStockFields(s){
   $$('input[name="stk"]',s).forEach(r=>r.onchange=()=>{ const on=$('input[name="stk"]:checked',s).value==="on"; $("#stkBox",s).hidden=!on; if(on) $("#f-stock",s).select(); });
   $$("[data-s]",s).forEach(b=>b.onclick=()=>{ const i=$("#f-stock",s); i.value=Math.max(0,(parseInt(i.value)||0)+ +b.dataset.s); });
 }
-function readStockFields(s){ return { stockOn: $('input[name="stk"]:checked',s).value==="on", stock: Math.max(0, parseInt($("#f-stock",s).value)||0) }; }
+function readStockFields(s){ return { stockOn: $('input[name="stk"]:checked',s).value==="on", stock: Math.max(0, parseInt($("#f-stock",s).value)||0), encZero: !!$("#f-enc0",s)?.checked }; }
 function quickStock(id){
   const p = DB.products.find(x=>x.id===id);
   openSheet({title:`Estoque · ${p.name}`, body: stockFields(p),
     foot:`<button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-primary" type="button" id="qsSave">Salvar estoque</button>`,
     onMount:s=>{ bindStockFields(s); if(p.stockOn) $("#f-stock",s).select();
       $("#qsSave",s).onclick=e=>busy(e.currentTarget, async()=>{ const v=readStockFields(s);
-        try{ await q(SB.from("produtos").update({estoque_ativo:v.stockOn, estoque:v.stock}).eq("id",p.id),"salvar o estoque"); }catch(e){ return; }
+        try{ await q(SB.from("produtos").update(Object.assign({estoque_ativo:v.stockOn, estoque:v.stock}, DB.encCol?{encomenda_ao_zerar:v.stockOn&&v.encZero}:{})).eq("id",p.id),"salvar o estoque"); }catch(e){ return; }
         Object.assign(p, v); closeSheet(); render();
-        toast(p.stockOn ? (p.stock? `${p.name}: ${p.stock} disponíveis no site` : `${p.name} esgotado no site`) : `${p.name} sem limite de estoque`); }); }});
+        toast(p.stockOn ? (p.stock? `${p.name}: ${p.stock} disponíveis no site` : (p.encZero?`${p.name} agora sob encomenda no site`:`${p.name} esgotado no site`)) : `${p.name} sem limite de estoque`); }); }});
 }
 
 /* ---- categorias ---- */
@@ -1167,7 +1169,8 @@ function afterOrders(){ renderAlert(); autoPrint(); }
 function pixPlanOf(o){
   if(o.pay!=="Pix") return null;
   let enc = 0, pronta = 0;
-  o.items.forEach(i=>{ const p = DB.products.find(x=>x.id===i.pid), v = i.qty*i.price; if(p && p.stockOn) pronta += v; else enc += v; });
+  if(o.kind) o.items.forEach(i=>{ const v = i.qty*i.price; if(o.kind==="pronta") pronta += v; else enc += v; });
+  else o.items.forEach(i=>{ const p = DB.products.find(x=>x.id===i.pid), v = i.qty*i.price; if(p && p.stockOn) pronta += v; else enc += v; });
   const fee = o.mode==="entrega" ? (o.fee||0) : 0, r = v => Math.round(v*100)/100;
   return { agora: r(pronta + enc/2 + fee), resto: r(enc/2), feeAberta: o.mode==="entrega" && o.fee==null };
 }
@@ -1213,7 +1216,7 @@ function comandaHTML(o){
     <div style="text-align:center;font-size:13px;letter-spacing:2px">PEDIDO</div>
     <div style="text-align:center;font-size:40px;font-weight:900;line-height:1">#${o.num}</div>
     <div style="text-align:center;font-size:11px;margin-top:3px">Recebido em ${recebido}</div>
-    ${band(ent?"ENTREGA":"RETIRADA NA LOJA")}
+    ${band((ent?"ENTREGA":"RETIRADA NA LOJA") + (o.kind==="pronta"?" · PRONTA":o.kind==="enc"?" · ENCOMENDA":""), o.kind?16:19)}
     <div style="border:2px solid #000;border-radius:4px;text-align:center;padding:5px 4px">
       ${rel?`<div style="font-size:22px;font-weight:900;letter-spacing:1px">${rel}</div>`:""}
       <div style="font-size:17px;font-weight:900">${esc(dataCheia(o.date))}${o.time?` · ${esc(o.time)}`:""}</div>
