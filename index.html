@@ -800,8 +800,9 @@ async function loadData(){
       id:x.id, name:x.nome, img:x.foto_url||"img/logo.svg", pos:x.foto_pos||"50% 50%", desc:x.descricao, serve:x.porcao,
       price:+x.preco, flavors:x.sabores||[], askFlavor:x.sabor_a_combinar,
       sizes:(x.tamanhos||[]).map(t=>[+t.qtd,+t.preco]), list:x.itens_combo||[], featured:x.destaque,
-      encZero: !!x.encomenda_ao_zerar,
-      soldOut: x.esgotado || (x.estoque_ativo && x.estoque<=0 && !x.encomenda_ao_zerar), stock: x.estoque_ativo ? x.estoque : null, combo:cat.is_combo
+      encZero: !!x.encomenda_ao_zerar, flav: flavMap(x),
+      soldOut: x.esgotado || (x.estoque_ativo && !x.encomenda_ao_zerar && (flavMap(x) ? (x.sabores||[]).every(f=>!(+flavMap(x)[f]>0)) : x.estoque<=0)),
+      stock: x.estoque_ativo ? x.estoque : null, combo:cat.is_combo
     }));
     const allRefri = cat.is_combo && items.length && items.every(i=>i.list.some(l=>/refrigerante/i.test(l)));
     return {id:cat.id, title:cat.nome, tag:cat.subtitulo, combo:cat.is_combo, note: allRefri?"Todos os combos já vêm com refrigerante 2L.":"", items};
@@ -818,23 +819,40 @@ function optGroup(item, key, legend, values, disabled=[]){
     return `<input type="radio" id="${id}" name="${name}" value="${i}" ${i===first?"checked":""} ${disabled[i]?"disabled":""}><label for="${id}">${v}</label>`;
   }).join("")}</div></fieldset>`;
 }
-function unitsInCart(pid){ return cart.filter(c=>c.pid===pid).reduce((a,c)=>a+c.units*c.qty,0); }
+/* estoque por sabor: {"Chocolate":2,"Ninho":1} (só quando a loja controla quantidade por sabor) */
+function flavMap(x){ const m = x.estoque_sabores; return x.estoque_ativo && m && typeof m==="object" && !Array.isArray(m) && (x.sabores||[]).length ? m : null; }
+function flavQty(it, f){ return Math.max(0, +((it.flav||{})[f]||0)); }
+function unitsInCart(pid, sabor){ return cart.filter(c=>c.pid===pid && (sabor===undefined || c.sabor===sabor)).reduce((a,c)=>a+c.units*c.qty,0); }
 /* "pronta" = tem estoque (sai no mesmo dia, 13:30–18:30); "enc" = sob encomenda
    (sem limite de estoque, ou estoque zerado com "aceitar encomenda ao zerar") */
-function itemKind(it){ return it.stock!=null && it.stock>0 ? "pronta" : "enc"; }
-function stockLeft(it){ return itemKind(it)==="pronta" ? Math.max(0, it.stock - unitsInCart(it.id)) : Infinity; }
+function itemKind(it, sabor){
+  if(it.flav){
+    if(sabor!=null) return flavQty(it,sabor)>0 ? "pronta" : (it.encZero ? "enc" : "out");
+    return it.flavors.some(f=>flavQty(it,f)>0) ? "pronta" : (it.encZero ? "enc" : "out");
+  }
+  return it.stock!=null && it.stock>0 ? "pronta" : "enc";
+}
+function stockLeft(it, sabor){
+  if(itemKind(it, sabor)!=="pronta") return Infinity;
+  return it.flav && sabor!=null ? Math.max(0, flavQty(it,sabor) - unitsInCart(it.id, sabor)) : Math.max(0, it.stock - unitsInCart(it.id));
+}
 function cartKind(){ return cart.length ? (cart[0].kind||"enc") : null; }
 function stockChip(it){
   if(it.soldOut) return `<span class="info bad">Esgotado</span>`;
-  if(itemKind(it)==="pronta") return `<span class="info ok">Pronta-entrega</span>` + (it.stock<=5 ? `<span class="info warn">Restam ${it.stock}${it.sizes.length?" un.":""}</span>` : "");
+  if(itemKind(it)==="pronta") return `<span class="info ok">Pronta-entrega</span>` + (!it.flav && it.stock<=5 ? `<span class="info warn">Restam ${it.stock}${it.sizes.length?" un.":""}</span>` : "");
   if(it.stock!=null && it.encZero) return `<span class="info">Sob encomenda</span>`;
   return "";
 }
 function cardHTML(item){
   let opts = "", price;
-  if(item.flavors.length>1) opts += optGroup(item,"sabor","Sabor",item.flavors.map(esc));
+  if(item.flavors.length>1){
+    if(item.flav) opts += optGroup(item,"sabor","Sabor",item.flavors.map(f=>{ const k = itemKind(item,f), n = flavQty(item,f);
+        return esc(f) + (k==="enc" ? " <small>(encomenda)</small>" : k==="pronta" && n<=5 ? ` <small>· restam ${n}</small>` : ""); }),
+      item.flavors.map(f=>itemKind(item,f)==="out"));
+    else opts += optGroup(item,"sabor","Sabor",item.flavors.map(esc));
+  }
   if(item.sizes.length){
-    const dis = item.sizes.map(([q])=>itemKind(item)==="pronta" && q>item.stock);
+    const dis = item.sizes.map(([q])=>!item.flav && itemKind(item)==="pronta" && q>item.stock);
     opts += optGroup(item,"qtd","Quantidade",item.sizes.map(([q,p])=>`${q} un. <b>${brl(p)}</b>`),dis);
     const first = Math.max(0, dis.findIndex(d=>!d));
     price = `<span class="price" data-price>${brl(item.sizes[first][1])}</span>`;
@@ -888,8 +906,9 @@ function renderMenu(){
   document.querySelectorAll(".group").forEach(g=>io.observe(g));
   // remove do carrinho o que não existe mais
   for(let i=cart.length-1;i>=0;i--) if(!byId[cart[i].pid] || byId[cart[i].pid].soldOut) cart.splice(i,1);
-  cart.forEach(c=>{ if(!c.kind) c.kind = itemKind(byId[c.pid]); });
-  const vis = Object.values(byId).filter(it=>!it.soldOut), temP = vis.some(it=>itemKind(it)==="pronta"), temE = vis.some(it=>itemKind(it)==="enc");
+  for(let i=cart.length-1;i>=0;i--){ const k = itemKind(byId[cart[i].pid], cart[i].sabor??undefined); if(k==="out") cart.splice(i,1); else cart[i].kind = k; }
+  const vis = Object.values(byId).filter(it=>!it.soldOut), temP = vis.some(it=>itemKind(it)==="pronta"),
+    temE = vis.some(it=>itemKind(it)==="enc" || (it.flav && it.encZero && it.flavors.some(f=>flavQty(it,f)<=0)));
   const ant = STORE.antecedencia_dias||0;
   $("noteETxt").innerHTML = `<strong>Encomendas${ant?`: com ${ant} dia${ant>1?"s":""} de antecedência`:""}</strong><br>Para confirmar, pague <strong>50% do valor</strong> no Pix e envie o comprovante no nosso WhatsApp.`;
   $("noteP").hidden = !temP; $("noteE").hidden = !temE; $("prontaNote").hidden = !(temP||temE);
@@ -915,13 +934,15 @@ function addToCart(id, card){
     if(q){ size = +q.value; const [n,p] = it.sizes[size]; label += ` (${n} un.)`; price = p; units = n; }
     if(it.serve && it.serve!=="Individual") detail.unshift(it.serve.toLowerCase());
   }
-  const kind = itemKind(it), ck = cartKind();
+  const kind = itemKind(it, it.flav ? sabor : undefined), ck = cartKind();
+  if(kind==="out"){ stockMsg(card, "Esse sabor acabou por hoje. Escolha outro sabor."); return false; }
   if(ck && ck!==kind){ stockMsg(card, ck==="pronta"
     ? "Seu pedido tem itens de pronta-entrega. Encomendas vão em um pedido separado."
     : "Seu pedido é de encomenda. Itens de pronta-entrega vão em um pedido separado."); return false; }
-  if(stockLeft(it) < units){ stockMsg(card, it.encZero
-    ? `Só temos ${it.stock} a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.`
-    : (it.stock - unitsInCart(it.id) <= 0 ? "Você já adicionou todo o estoque disponível." : `Só restam ${stockLeft(it)} unidade(s).`)); return false; }
+  const sb = it.flav ? sabor : undefined, left = stockLeft(it, sb), disp = it.flav ? flavQty(it, sabor) : it.stock;
+  if(left < units){ stockMsg(card, it.encZero
+    ? `Só temos ${disp}${it.flav?` de ${sabor}`:""} a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.`
+    : (left <= 0 ? `Você já adicionou todo o estoque disponível${it.flav?` de ${sabor}`:""}.` : `Só restam ${left} unidade(s)${it.flav?` de ${sabor}`:""}.`)); return false; }
   const key = id+"|"+size+"|"+(sabor||"");
   const found = cart.find(c=>c.key===key);
   if(found) found.qty++; else cart.push({key,pid:id,size,sabor,label,detail,price,units,qty:1,kind});
@@ -1028,7 +1049,10 @@ function updateTotals(){
 }
 $("lines").addEventListener("click", e=>{
   const t = e.target.closest("button"); if(!t) return;
-  if(t.dataset.inc){ const c = cart[+t.dataset.inc], it = byId[c.pid]; if(it && stockLeft(it) < c.units) return flashErr(it.encZero ? `Só temos ${it.stock} de ${it.name} a pronta-entrega. Para mais, faça um pedido por encomenda separado.` : `Só restam ${it.stock} unidade(s) de ${it.name}.`); c.qty++; }
+  if(t.dataset.inc){ const c = cart[+t.dataset.inc], it = byId[c.pid], sb = it&&it.flav ? c.sabor : undefined;
+    if(it && stockLeft(it, sb) < c.units){ const disp = it.flav ? flavQty(it, c.sabor) : it.stock, nm = it.flav ? `${it.name} (${c.sabor})` : it.name;
+      return flashErr(it.encZero ? `Só temos ${disp} de ${nm} a pronta-entrega. Para mais, faça um pedido por encomenda separado.` : `Só restam ${disp} unidade(s) de ${nm}.`); }
+    c.qty++; }
   if(t.dataset.dec){ const c = cart[+t.dataset.dec]; c.qty--; if(c.qty<1) cart.splice(+t.dataset.dec,1); }
   if(t.dataset.rm) cart.splice(+t.dataset.rm,1);
   refresh();

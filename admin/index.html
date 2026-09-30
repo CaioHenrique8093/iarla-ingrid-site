@@ -456,10 +456,10 @@ let DB = { categories:[], products:[], delivery:{on:true,outside:"combinar",bair
 const catFrom = r => ({id:r.id, name:r.nome, tag:r.subtitulo, active:r.ativo, combo:r.is_combo, ordem:r.ordem});
 const prodFrom = r => ({id:r.id, cat:r.categoria_id, name:r.nome, img:r.foto_url, pos:r.foto_pos||"50% 50%", desc:r.descricao, serve:r.porcao,
   price:+r.preco, flavors:r.sabores||[], askFlavor:r.sabor_a_combinar, sizes:(r.tamanhos||[]).map(t=>[+t.qtd,+t.preco]), items:r.itens_combo||[],
-  featured:r.destaque, active:r.ativo, soldOut:r.esgotado, stockOn:r.estoque_ativo, stock:r.estoque, encZero:!!r.encomenda_ao_zerar, ordem:r.ordem});
+  featured:r.destaque, active:r.ativo, soldOut:r.esgotado, stockOn:r.estoque_ativo, stock:r.estoque, encZero:!!r.encomenda_ao_zerar, flav:(r.estoque_sabores&&typeof r.estoque_sabores==="object"&&!Array.isArray(r.estoque_sabores))?r.estoque_sabores:null, ordem:r.ordem});
 const prodTo = p => ({categoria_id:p.cat, nome:p.name, descricao:p.desc||"", foto_url:p.img||"", foto_pos:p.pos||"50% 50%", porcao:p.serve||"",
   preco:+p.price||0, sabores:p.flavors||[], sabor_a_combinar:!!p.askFlavor, tamanhos:(p.sizes||[]).map(([q,pr])=>({qtd:q,preco:pr})), itens_combo:p.items||[],
-  destaque:!!p.featured, ativo:!!p.active, esgotado:!!p.soldOut, estoque_ativo:!!p.stockOn, estoque:+p.stock||0, ...(DB.encCol?{encomenda_ao_zerar:!!(p.stockOn&&p.encZero)}:{}), ordem:p.ordem||0, atualizado_em:new Date().toISOString()});
+  destaque:!!p.featured, ativo:!!p.active, esgotado:!!p.soldOut, estoque_ativo:!!p.stockOn, estoque:flavClean(p)?Object.values(flavClean(p)).reduce((a,b)=>a+b,0):(+p.stock||0), ...(DB.flavCol?{estoque_sabores:flavClean(p)}:{}), ...(DB.encCol?{encomenda_ao_zerar:!!(p.stockOn&&p.encZero)}:{}), ordem:p.ordem||0, atualizado_em:new Date().toISOString()});
 const orderFrom = r => ({id:r.id, num:r.numero, printed:r.impresso_em||(typeof printedHere!=="undefined"&&printedHere.has(r.id)?new Date().toISOString():null), created:r.criado_em, name:r.cliente_nome, phone:r.cliente_whatsapp, mode:r.modo, bairro:r.bairro||"", address:r.endereco||"",
   ref:r.referencia||"", fee:r.taxa==null?null:+r.taxa, date:r.data_desejada, time:r.horario||"", pay:r.pagamento, troco:r.troco||"", obs:r.observacoes||"",
   kind:r.tipo||null, status:r.status, total:+r.total, sub:+r.subtotal, items:(r.pedido_itens||[]).map(i=>({pid:i.produto_id,label:i.nome,detail:i.detalhe,qty:i.qtd,price:+i.preco_unit}))});
@@ -473,7 +473,7 @@ function storeFrom(c, f){
 async function loadCatalog(){
   const [c,p] = await Promise.all([ SB.from("categorias").select("*").order("ordem"), SB.from("produtos").select("*").order("ordem") ]);
   if(c.error||p.error) throw (c.error||p.error);
-  DB.categories = c.data.map(catFrom); DB.products = p.data.map(prodFrom); DB.encCol = !!p.data.length && ("encomenda_ao_zerar" in p.data[0]);
+  DB.categories = c.data.map(catFrom); DB.products = p.data.map(prodFrom); DB.encCol = !!p.data.length && ("encomenda_ao_zerar" in p.data[0]); DB.flavCol = !!p.data.length && ("estoque_sabores" in p.data[0]);
   if(!DB.categories.find(x=>x.id===catSel)) catSel = DB.categories[0]?.id;
 }
 async function loadStore(){
@@ -661,13 +661,14 @@ function prodRow(p, i, n){
   const sk = !p.stockOn ? ["", "Encomenda", "Sem limite", ""]
     : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.stock===1?" unidade":" unidades"),
        p.encZero?"Ao zerar: vira encomenda":"Ao zerar: esgota"];
+  const fc = flavClean(p), flavLine = fc ? Object.entries(fc).map(([f,n])=>`${esc(f)} ${n}`).join(" · ") : "";
   const price = p.sizes?.length ? `a partir de ${brl(Math.min(...p.sizes.map(s=>s[1])))}` : brl(p.price);
   return `<article class="prod${p.active?"":" is-hidden"}" data-pid="${p.id}" draggable="true">
     <div class="order-ctl"><button type="button" class="grip" aria-label="Arrastar para reordenar" tabindex="-1">${ic("grip")}</button><button type="button" data-mv="-1" aria-label="Subir ${esc(p.name)}" ${i===0?"disabled":""}>${ic("up")}</button><button type="button" data-mv="1" aria-label="Descer ${esc(p.name)}" ${i===n-1?"disabled":""}>${ic("down")}</button></div>
     <div class="ph"><img src="${esc(imgSrc(p.img))}" alt="" loading="lazy" style="object-position:${esc(p.pos)}"></div>
     <div class="info"><span class="name">${esc(p.name)}</span><span class="meta"><span class="price">${price}</span>${status}${p.featured?'<span class="pill p-ok">Mais pedido</span>':""}</span>
       <button type="button" class="stockbtn${sk[0]}" data-qs aria-label="Estoque de ${esc(p.name)}: ${sk[1]}, ${sk[2]}. ${sk[3]}. Toque para alterar">
-        <span class="k">${sk[1]}</span><b>${sk[2]}</b>${ic("edit")}${sk[3]?`<span class="sub">${sk[3]}</span>`:""}
+        <span class="k">${sk[1]}</span><b>${sk[2]}</b>${ic("edit")}${flavLine?`<span class="sub" style="color:var(--ink)">${flavLine}</span>`:""}${sk[3]?`<span class="sub">${sk[3]}</span>`:""}
       </button>
     </div>
     <div class="acts">
@@ -722,8 +723,18 @@ async function reorderTo(fromId, toId, after){
 }
 
 /* ---- estoque ---- */
+/* estoque por sabor: só vale para sabores que existem no produto */
+function flavClean(p){
+  if(!p.stockOn || !p.flav || (p.flavors||[]).length<2) return null;
+  const o = {}; p.flavors.forEach(f=>o[f]=Math.max(0, parseInt(p.flav[f])||0)); return o;
+}
+function flavRows(flavors, map){
+  return flavors.map(f=>`<div class="row" data-fl="${esc(f)}" style="justify-content:space-between;gap:10px"><span style="font-weight:600">${esc(f)}</span>
+    <span class="stock"><button type="button" data-fs="-1" aria-label="Diminuir ${esc(f)}">−</button><input class="stk-in" type="number" inputmode="numeric" min="0" value="${Math.max(0,parseInt((map||{})[f])||0)}" aria-label="Quantidade de ${esc(f)}"><button type="button" data-fs="1" aria-label="Aumentar ${esc(f)}">+</button></span></div>`).join("");
+}
 function stockFields(d){
   const unit = d.sizes?.length ? "unidades (ex.: docinhos avulsos)" : "unidades";
+  const canFlav = DB.flavCol && (d.flavors||[]).length>1, byFlav = canFlav && !!d.flav;
   return `<div class="card" style="background:var(--surface-2);display:grid;gap:12px">
     <span class="lbl" style="font-size:14px;font-weight:600">Estoque</span>
     <div class="radio-cards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr))">
@@ -731,25 +742,47 @@ function stockFields(d){
       <label class="rc"><input type="radio" name="stk" value="on" ${d.stockOn?"checked":""}><span><b>Quantidade</b><span>Pronta-entrega</span></span></label>
     </div>
     <div id="stkBox" class="row wrapx" ${d.stockOn?"":"hidden"}>
-      <span class="stock"><button type="button" data-s="-1" aria-label="Diminuir">−</button><input class="stk-in" id="f-stock" type="number" inputmode="numeric" min="0" value="${d.stock||0}" aria-label="Quantidade disponível"><button type="button" data-s="1" aria-label="Aumentar">+</button></span>
-      <span class="muted small">${unit} disponíveis</span>
+      ${DB.flavCol?`<label class="row" id="flavTg" style="gap:10px;flex-basis:100%;cursor:pointer" ${canFlav?"":"hidden"}><input type="checkbox" id="f-byflav" ${byFlav?"checked":""} style="width:20px;height:20px;accent-color:var(--brown)"><span><b>Quantidade por sabor</b><br><span class="muted small">Cada sabor com a sua quantidade. O sabor que zerar não pode ser escolhido no site.</span></span></label>`:""}
+      <div id="stkOne" class="row wrapx" style="flex-basis:100%" ${byFlav?"hidden":""}>
+        <span class="stock"><button type="button" data-s="-1" aria-label="Diminuir">−</button><input class="stk-in" id="f-stock" type="number" inputmode="numeric" min="0" value="${d.stock||0}" aria-label="Quantidade disponível"><button type="button" data-s="1" aria-label="Aumentar">+</button></span>
+        <span class="muted small">${unit} disponíveis</span>
+      </div>
+      <div id="stkFlav" style="display:grid;gap:8px;flex-basis:100%" ${byFlav?"":"hidden"}>${canFlav?flavRows(d.flavors, d.flav):""}</div>
       ${DB.encCol?`<label class="row" style="gap:10px;flex-basis:100%;cursor:pointer"><input type="checkbox" id="f-enc0" ${d.encZero?"checked":""} style="width:20px;height:20px;accent-color:var(--brown)"><span><b>Quando zerar, aceitar por encomenda</b><br><span class="muted small">Em vez de “Esgotado”, o site passa a vender sob encomenda.</span></span></label>`:""}
     </div>
     <span class="hint small muted">Com quantidade, o site mostra “Pronta-entrega” e “Restam X” (entrega no mesmo dia, 13:30 às 18:30) e não deixa pedir mais do que tem. Ao zerar: “Esgotado”, ou encomenda se marcado acima. Cancelou um pedido? O estoque volta sozinho.</span>
   </div>`;
 }
 function bindStockFields(s){
-  $$('input[name="stk"]',s).forEach(r=>r.onchange=()=>{ const on=$('input[name="stk"]:checked',s).value==="on"; $("#stkBox",s).hidden=!on; if(on) $("#f-stock",s).select(); });
+  const byFlav = () => !!$("#f-byflav",s)?.checked && !$("#flavTg",s)?.hidden;
+  const sync = () => { const f = byFlav(); if($("#stkOne",s)) $("#stkOne",s).hidden = f; if($("#stkFlav",s)) $("#stkFlav",s).hidden = !f; };
+  $$('input[name="stk"]',s).forEach(r=>r.onchange=()=>{ const on=$('input[name="stk"]:checked',s).value==="on"; $("#stkBox",s).hidden=!on; if(on && !byFlav()) $("#f-stock",s).select(); });
   $$("[data-s]",s).forEach(b=>b.onclick=()=>{ const i=$("#f-stock",s); i.value=Math.max(0,(parseInt(i.value)||0)+ +b.dataset.s); });
+  $("#f-byflav",s)?.addEventListener("change", sync);
+  $("#stkFlav",s)?.addEventListener("click",e=>{ const b=e.target.closest("[data-fs]"); if(!b) return; const i=$("input",b.parentElement); i.value=Math.max(0,(parseInt(i.value)||0)+ +b.dataset.fs); });
+  // o produto ganhou/perdeu sabores no editor: redesenha as linhas mantendo o que já foi digitado
+  s._flavRefresh = flavors => {
+    if(!$("#stkFlav",s)) return;
+    const cur = {}; $$("#stkFlav [data-fl]",s).forEach(r=>cur[r.dataset.fl]=parseInt($("input",r).value)||0);
+    $("#stkFlav",s).innerHTML = flavors.length>1 ? flavRows(flavors, cur) : "";
+    $("#flavTg",s).hidden = flavors.length<2; sync();
+  };
 }
-function readStockFields(s){ return { stockOn: $('input[name="stk"]:checked',s).value==="on", stock: Math.max(0, parseInt($("#f-stock",s).value)||0), encZero: !!$("#f-enc0",s)?.checked }; }
+function readStockFields(s){
+  const stockOn = $('input[name="stk"]:checked',s).value==="on", encZero = !!$("#f-enc0",s)?.checked;
+  if(stockOn && $("#f-byflav",s)?.checked && !$("#flavTg",s)?.hidden){
+    const flav = {}; $$("#stkFlav [data-fl]",s).forEach(r=>flav[r.dataset.fl]=Math.max(0, parseInt($("input",r).value)||0));
+    return { stockOn, flav, stock: Object.values(flav).reduce((a,b)=>a+b,0), encZero };
+  }
+  return { stockOn, flav: null, stock: Math.max(0, parseInt($("#f-stock",s).value)||0), encZero };
+}
 function quickStock(id){
   const p = DB.products.find(x=>x.id===id);
   openSheet({title:`Estoque · ${p.name}`, body: stockFields(p),
     foot:`<button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-primary" type="button" id="qsSave">Salvar estoque</button>`,
-    onMount:s=>{ bindStockFields(s); if(p.stockOn) $("#f-stock",s).select();
+    onMount:s=>{ bindStockFields(s); if(p.stockOn && !p.flav) $("#f-stock",s).select();
       $("#qsSave",s).onclick=e=>busy(e.currentTarget, async()=>{ const v=readStockFields(s);
-        try{ await q(SB.from("produtos").update(Object.assign({estoque_ativo:v.stockOn, estoque:v.stock}, DB.encCol?{encomenda_ao_zerar:v.stockOn&&v.encZero}:{})).eq("id",p.id),"salvar o estoque"); }catch(e){ return; }
+        try{ await q(SB.from("produtos").update(Object.assign({estoque_ativo:v.stockOn, estoque:v.stock}, DB.encCol?{encomenda_ao_zerar:v.stockOn&&v.encZero}:{}, DB.flavCol?{estoque_sabores:v.stockOn?v.flav:null}:{})).eq("id",p.id),"salvar o estoque"); }catch(e){ return; }
         Object.assign(p, v); closeSheet(); render();
         toast(p.stockOn ? (p.stock? `${p.name}: ${p.stock} disponíveis no site` : (p.encZero?`${p.name} agora sob encomenda no site`:`${p.name} esgotado no site`)) : `${p.name} sem limite de estoque`); }); }});
 }
@@ -897,10 +930,10 @@ function editProduct(id){
     onMount:s=>{
       mountPhoto(s,d);
       const tags=$("#tags",s);
-      if(tags){ const add=()=>{ const i=$("#tagIn",s); const v=i.value.trim().replace(/,$/,""); if(v&&!d.flavors.includes(v)){ d.flavors.push(v); i.insertAdjacentHTML("beforebegin",`<span class="tag">${esc(v)}<button type="button" aria-label="Remover ${esc(v)}">${ic("x")}</button></span>`);} i.value=""; };
-        $("#tagIn",s).addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===","){ e.preventDefault(); add(); } if(e.key==="Backspace"&&!e.target.value&&d.flavors.length){ d.flavors.pop(); e.target.previousElementSibling?.remove(); } });
+      if(tags){ const add=()=>{ const i=$("#tagIn",s); const v=i.value.trim().replace(/,$/,""); if(v&&!d.flavors.includes(v)){ d.flavors.push(v); i.insertAdjacentHTML("beforebegin",`<span class="tag">${esc(v)}<button type="button" aria-label="Remover ${esc(v)}">${ic("x")}</button></span>`); s._flavRefresh?.(d.flavors);} i.value=""; };
+        $("#tagIn",s).addEventListener("keydown",e=>{ if(e.key==="Enter"||e.key===","){ e.preventDefault(); add(); } if(e.key==="Backspace"&&!e.target.value&&d.flavors.length){ d.flavors.pop(); e.target.previousElementSibling?.remove(); s._flavRefresh?.(d.flavors); } });
         $("#tagIn",s).addEventListener("blur",add);
-        tags.addEventListener("click",e=>{ const b=e.target.closest(".tag button"); if(!b){ $("#tagIn",s).focus(); return; } const t=b.parentElement; d.flavors.splice([...tags.querySelectorAll(".tag")].indexOf(t),1); t.remove(); }); }
+        tags.addEventListener("click",e=>{ const b=e.target.closest(".tag button"); if(!b){ $("#tagIn",s).focus(); return; } const t=b.parentElement; d.flavors.splice([...tags.querySelectorAll(".tag")].indexOf(t),1); t.remove(); s._flavRefresh?.(d.flavors); }); }
       $$('input[name="ptype"]',s).forEach(r=>r.onchange=()=>{ const sz=$('input[name="ptype"]:checked',s).value==="sizes"; $("#priceSizes",s).hidden=!sz; $("#priceSingle",s).hidden=sz; });
       $("#addSize",s)?.addEventListener("click",()=>$("#addSize",s).insertAdjacentHTML("beforebegin",sizeRow([0,0])));
       s.addEventListener("click",e=>{ const b=e.target.closest("[data-rm]"); if(b) b.parentElement.remove(); });
