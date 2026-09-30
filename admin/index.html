@@ -1273,7 +1273,7 @@ srM6+4c6deScQ13A83xEemWvTRKr+s8lvjPU5GhJH0iA9qDR7DhItdnS+glKm3AX
 3x1cVji5s48UqPe3ICYbYPj4fxIR0RjmL6y//eB5FmsOYtTsKSg+F96fo7mh0nkN
 B71Mk2QwSws6cD62XbkVwhQmjxej
 -----END CERTIFICATE-----`;
-let qzState = "off", qzReconnect = null, qzPrinters = [];
+let qzState = "off", qzReconnect = null, qzPrinters = [], qzConnecting = null;
 function qzAvailable(){ return !!(window.qz && qz.websocket); }
 let qzConfigured = false;
 function qzSetup(){
@@ -1292,9 +1292,14 @@ async function qzConnect(){
   if(!qzAvailable()){ qzState = "nolib"; updatePrintBar(); return false; }
   qzSetup();
   if(qz.websocket.isActive()){ qzState = "on"; return true; }
+  if(qzConnecting){ await qzConnecting; return qzState === "on"; }
   qzState = "connecting"; updatePrintBar();
-  try{ await qz.websocket.connect({ retries:1, delay:1 }); qzState = "on"; }
-  catch(e){ qzState = "off"; }
+  // sem o QZ Tray aberto, desiste em 10 s (senão fica "Conectando…" para sempre)
+  const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error("tempo esgotado")), 10000));
+  qzConnecting = Promise.race([qz.websocket.connect({ retries:0, delay:0 }), timeout])
+    .then(()=>{ qzState = "on"; }, ()=>{ qzState = qz.websocket.isActive() ? "on" : "off"; })
+    .finally(()=>{ qzConnecting = null; updatePrintBar(); });
+  await qzConnecting;
   updatePrintBar();
   return qzState === "on";
 }
