@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Iarla Ingrid Padaria e Doceria</title>
-<meta name="description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido e envie pelo WhatsApp.">
+<meta name="description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido pelo site e receba a confirmação no WhatsApp.">
 <meta name="theme-color" content="#4A2C20">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="Iarla Ingrid Padaria e Doceria">
-<meta property="og:description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido e envie pelo WhatsApp.">
+<meta property="og:description" content="Bolos, tortas, docinhos, salgados e combos de aniversário em Sobral. Monte seu pedido pelo site e receba a confirmação no WhatsApp.">
 <meta property="og:image" content="https://iarlaingridpadaria.com.br/img/compartilhar-v2.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -409,6 +409,17 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
 .done h3{margin:6px 0 0;font-family:var(--display);font-weight:600;font-size:32px;color:var(--brown)}
 .done p{margin:0;color:var(--ink-soft);max-width:40ch}
 .done-acts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
+.pixbox{width:100%;display:grid;gap:10px;text-align:left;margin-top:6px;padding:16px;border:1.5px solid var(--line);border-radius:18px;background:var(--bg)}
+.pixbox h4{margin:0;font-size:16px;color:var(--brown);display:flex;align-items:center;gap:8px}
+.pixbox .val{font-family:var(--display);font-size:34px;font-weight:600;color:var(--brown);line-height:1}
+.pixbox .sub{font-size:13.5px;color:var(--ink-soft)}
+.pixkey{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:14px;background:var(--surface);border:1px dashed var(--line)}
+.pixkey code{display:block;font:700 16px/1.25 var(--sans);letter-spacing:.2px;color:var(--ink);white-space:nowrap}
+.pixkey button{flex:1 0 auto;max-width:100%;min-height:40px;padding:0 14px;border-radius:12px;border:1.5px solid var(--brown);background:var(--brown);color:var(--on-brown);font-weight:700;cursor:pointer}
+.pixbox .btn{width:100%;text-align:center;gap:8px}
+.pixbox .btn svg{width:20px;height:20px;flex:none}
+.totals .row.pixnow{margin-top:6px;padding-top:8px;border-top:1px dashed var(--line);font-weight:700;color:var(--brown)}
+.totals .row.pixrest{font-size:14px;color:var(--ink-soft)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .info.warn{color:#F0B35A;background:#3A2A12}:root:not([data-theme="light"]) .info.bad{color:#F2877F;background:#3B1A18}}
 </style>
 </head>
@@ -438,7 +449,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <div>
         <span class="eyebrow in d1">Sobral · Delivery e retirada</span>
         <h1 class="in d2"><span class="l1">Feito com carinho para</span> <span class="script">adoçar</span> seus momentos</h1>
-        <p class="lead in d3">Bolos, tortas, docinhos e salgados para o seu dia a dia e para a sua festa. Monte seu pedido aqui e envie direto pelo WhatsApp.</p>
+        <p class="lead in d3">Bolos, tortas, docinhos e salgados para o seu dia a dia e para a sua festa. Monte seu pedido aqui pelo site e a gente confirma com você no WhatsApp.</p>
 
         <ul class="facts in d4">
           <li>
@@ -493,7 +504,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
         <a class="back" href="#inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Início</a>
         <span class="kicker">escolha e adicione</span>
         <h2>Nosso cardápio</h2>
-        <p>Toque em <strong>Adicionar</strong> nos itens que quiser. No final, você revisa o pedido e envia tudo pelo WhatsApp.</p>
+        <p>Toque em <strong>Adicionar</strong> nos itens que quiser. No final, você revisa e confirma o pedido aqui mesmo.</p>
       </div>
       <p class="loading" id="loading">Carregando cardápio…</p>
 
@@ -517,8 +528,16 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <div class="done" id="doneBox" hidden>
         <div class="done-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
         <h3 id="doneTitle">Pedido enviado!</h3>
-        <p id="doneText">Agora é só confirmar o envio da mensagem no WhatsApp. A loja responde por lá.</p>
-        <div class="done-acts"><a class="btn btn-wa" id="doneWa" href="#">Abrir o WhatsApp de novo</a><button class="btn btn-ghost" type="button" id="newOrder">Fazer outro pedido</button></div>
+        <p id="doneText">A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp para confirmar e combinar o pagamento.</p>
+        <div class="pixbox" id="pixBox" hidden>
+          <h4>Pague com Pix</h4>
+          <div><div class="val" id="pixVal">R$ 0,00</div><div class="sub" id="pixValSub"></div></div>
+          <div class="pixkey"><div style="flex:1 1 auto"><div class="sub" id="pixKeyLbl">Chave Pix (CNPJ)</div><code id="pixKey"></code></div><button type="button" id="pixCopy">Copiar</button></div>
+          <div class="sub">Nome: <b id="pixName"></b></div>
+          <div class="sub">Depois de pagar, envie o comprovante no WhatsApp da loja.</div>
+          <a class="btn btn-wa" id="pixSend" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z"/><path d="M9 9.5c.3 2.3 2.2 4.3 4.5 4.8l1.2-1.2 2 .9c-.2 1.3-1.2 2-2.5 2-3.9 0-7-3.1-7-7 0-1.3.7-2.3 2-2.5l.9 2-1.1 1z"/></svg>Enviar comprovante</a>
+        </div>
+        <div class="done-acts"><a class="btn btn-ghost" id="doneWa" href="#" target="_blank" rel="noopener">Falar com a loja</a><button class="btn btn-primary" type="button" id="newOrder">Fazer outro pedido</button></div>
       </div>
       <div class="order-grid" id="orderGrid">
         <div class="panel summary">
@@ -528,6 +547,8 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
             <div class="row"><span>Subtotal</span><span class="sub" id="subtotal">R$ 0,00</span></div>
             <div class="row fee" id="feeRow"><span>Entrega</span><em id="feeVal">escolha o bairro</em></div>
             <div class="row" id="totalRow" hidden><span><b>Total</b></span><span class="sub" id="totalVal">R$ 0,00</span></div>
+            <div class="row pixnow" id="pixNowRow" hidden><span id="pixNowLbl">Pagar agora no Pix</span><span id="pixNowVal">R$ 0,00</span></div>
+            <div class="row pixrest" id="pixRestRow" hidden><span id="pixRestLbl">Restante na retirada</span><span id="pixRestVal">R$ 0,00</span></div>
           </div>
         </div>
 
@@ -600,6 +621,10 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
                 <input type="radio" id="p-2" name="pag" value="Dinheiro"><label for="p-2"><strong>Dinheiro</strong></label>
               </div>
             </div>
+            <div class="notice" id="pixHint" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>
+              <span id="pixHintTxt"></span>
+            </div>
             <div class="fld" id="trocoBox" hidden>
               <label for="troco">Troco para quanto?</label>
               <input id="troco" name="troco" inputmode="decimal" placeholder="Ex.: R$ 200 (deixe vazio se não precisar)">
@@ -611,18 +636,14 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
             </div>
 
             <p class="formerr" id="formErr" role="alert"></p>
-            <button class="btn btn-wa send" id="sendBtn" type="button">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z"/><path d="M9 9.5c.3 2.3 2.2 4.3 4.5 4.8l1.2-1.2 2 .9c-.2 1.3-1.2 2-2.5 2-3.9 0-7-3.1-7-7 0-1.3.7-2.3 2-2.5l.9 2-1.1 1z"/></svg>
-              <span id="sendLbl">Enviar pedido pelo WhatsApp</span>
+            <button class="btn btn-primary send" id="sendBtn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+              <span id="sendLbl">Confirmar pedido</span>
             </button>
-            <a class="btn btn-ghost" id="fallbackBtn" href="#" hidden>Enviar mesmo assim pelo WhatsApp</a>
-            <p class="hint" style="margin:0;text-align:center"><span id="sendHint">Atendemos de seg a sex, 8h às 18h, e sáb, 8h às 13h.</span><br>Abre o WhatsApp da loja com o pedido já escrito. É só tocar em enviar.</p>
+            <a class="btn btn-wa" id="fallbackBtn" href="#" hidden>Enviar pelo WhatsApp</a>
+            <p class="hint" style="margin:0;text-align:center"><span id="sendHint">Atendemos de seg a sex, 8h às 18h, e sáb, 8h às 13h.</span><br>A loja recebe na hora e te chama no WhatsApp para confirmar.</p>
 
-            <details class="preview">
-              <summary>Ver como a mensagem vai chegar</summary>
-              <pre id="preview"></pre>
-              <button class="copy" type="button" id="copyBtn">Copiar mensagem</button>
-            </details>
+            <pre id="preview" hidden></pre>
             <p class="hint privacy">Seus dados são usados apenas para preparar e entregar o seu pedido.</p>
           </div>
         </form>
@@ -714,7 +735,8 @@ let STORE = {
   maps_url:"https://maps.app.goo.gl/b3YLrxRe1buPjxUg9",
   horarios:[{aberto:false,de:"08:00",ate:"12:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"13:00"}],
   pagamentos:{"Pix":true,"Cartão":true,"Dinheiro":true}, antecedencia_dias:1,
-  entrega_ativa:true, bairro_fora:"combinar", aviso_ativo:false, aviso_texto:""
+  entrega_ativa:true, bairro_fora:"combinar", aviso_ativo:false, aviso_texto:"",
+  chave_pix:"65815467000135", pix_tipo:"CNPJ", pix_titular:"Iarla Ingrid Padaria e Doceria"
 };
 let BAIRROS = [], FECH = [], MENU = [], byId = {};
 
@@ -898,6 +920,23 @@ function bairroInfo(){
   return b ? {fee:+b.taxa, name:b.nome, known:true, id:b.id} : {fee:null, name:"", known:false};
 }
 const subtotal = () => cart.reduce((a,c)=>a+c.qty*c.price,0);
+/* Pix: encomenda (produto sem limite de estoque) paga 50% agora;
+   pronta-entrega (estoque limitado) paga 100%; a taxa de entrega vai junto no Pix. */
+const cents = v => Math.round(v*100)/100;
+function pixPlan(){
+  const b = bairroInfo(), ent = modo()==="entrega";
+  let enc = 0, pronta = 0;
+  cart.forEach(c=>{ const it = byId[c.pid], v = c.qty*c.price; if(it && it.stock!=null) pronta += v; else enc += v; });
+  const fee = ent && b.known ? (b.fee||0) : 0;
+  const agora = cents(pronta + enc/2 + fee), resto = cents(enc/2);
+  return { agora, resto, total: cents(pronta+enc+fee), enc: cents(enc), pronta: cents(pronta), feeAberta: ent && !b.known };
+}
+function fmtPixKey(k, tipo){
+  const d = String(k||"").replace(/\D/g,"");
+  if(tipo==="CNPJ" && d.length===14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  if(tipo==="CPF" && d.length===11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+  return String(k||"");
+}
 
 function renderOrder(){
   const box = $("lines");
@@ -933,6 +972,21 @@ function updateTotals(){
   $("totalVal").textContent = brl(sub + (ent&&b.known?b.fee:0));
   $("bairroOutro").hidden = !(b.outro);
   $("trocoBox").hidden = pag()!=="Dinheiro";
+  const isPix = pag()==="Pix" && cart.length, pp = pixPlan();
+  $("pixNowRow").hidden = !isPix; $("pixRestRow").hidden = !isPix || !(pp.resto>0);
+  $("pixHint").hidden = !isPix;
+  if(isPix){
+    $("pixNowLbl").textContent = pp.resto>0 ? "Pagar agora no Pix (sinal)" : "Pagar agora no Pix";
+    $("pixNowVal").textContent = brl(pp.agora) + (pp.feeAberta?" + taxa":"");
+    $("pixRestLbl").textContent = `Restante na ${ent?"entrega":"retirada"}`;
+    $("pixRestVal").textContent = brl(pp.resto);
+    const onde = ent ? "entrega" : "retirada";
+    $("pixHintTxt").textContent = (pp.enc>0 && pp.pronta>0)
+      ? `Encomendas pagam 50% agora no Pix e o restante na ${onde}. Itens de pronta-entrega são pagos por inteiro. A chave Pix aparece ao confirmar.`
+      : pp.enc>0
+      ? `Encomenda: você paga 50% agora no Pix e o restante na ${onde}. A chave Pix aparece ao confirmar.`
+      : "Pagamento total no Pix. A chave aparece ao confirmar o pedido.";
+  }
   $("preview").textContent = buildMessage();
 }
 $("lines").addEventListener("click", e=>{
@@ -1010,27 +1064,58 @@ function payload(){
     referencia:v("ref"), data:v("data"), horario:v("hora"), pagamento:pag(), troco:v("troco"), obs:v("obs"),
     itens: cart.map(c=>({produto_id:c.pid, qtd:c.qty, tamanho:c.size, sabor:c.sabor})) };
 }
-function finish(num, msg){
-  const link = waLink(msg);
-  try{ localStorage.setItem("ii-last", JSON.stringify({num, link, at:Date.now()})); }catch(e){}
+function finish(num){
+  const fone = $("whats").value.trim();
+  const pix = pag()==="Pix" ? Object.assign(pixPlan(), {modo:modo()}) : null;
+  try{ localStorage.setItem("ii-last", JSON.stringify({num, fone, pix, at:Date.now()})); }catch(e){}
   cart.length = 0; saveCart(); renderBar(false); renderOrder();
   history.replaceState(null, "", "#pedido"); route();
-  showDone(num, link);
+  showDone(num, fone, null, pix);
+}
+/* banco fora do ar: o pedido vai pelo WhatsApp, como antes */
+function finishWhatsApp(msg){
+  const link = waLink(msg);
+  cart.length = 0; saveCart(); renderBar(false); renderOrder();
+  history.replaceState(null, "", "#pedido"); route();
+  showDone(null, "", link);
   location.href = link;
 }
-function showDone(num, link){
+function showDone(num, fone, link, pix){
   $("orderGrid").hidden = true; $("doneBox").hidden = false;
-  $("doneTitle").textContent = num ? `Pedido nº ${num} registrado!` : "Pedido pronto!";
-  $("doneWa").href = link;
+  $("pixBox").hidden = !(pix && !link);
+  if(link){
+    $("doneTitle").textContent = "Pedido pronto!";
+    $("doneText").textContent = "Agora é só tocar em enviar na conversa do WhatsApp. A loja responde por lá.";
+    $("doneWa").href = link; $("doneWa").textContent = "Abrir o WhatsApp de novo";
+  } else {
+    $("doneTitle").textContent = num ? `Pedido nº ${num} recebido!` : "Pedido recebido!";
+    $("doneText").textContent = `A loja já recebeu o seu pedido. Em instantes a Iarla te chama no WhatsApp${fone?`, no número ${fone},`:""} para confirmar e combinar o pagamento.`;
+    $("doneWa").href = waLink(num ? `Olá! Fiz o pedido nº ${num} pelo site.` : "Olá! Fiz um pedido pelo site."); $("doneWa").textContent = "Falar com a loja";
+    if(pix){
+      $("doneText").textContent = `A loja já recebeu o seu pedido. Faça o Pix abaixo e envie o comprovante. A Iarla confirma com você pelo WhatsApp${fone?`, no número ${fone}`:""}.`;
+      $("pixVal").textContent = brl(pix.agora) + (pix.feeAberta?" + taxa":"");
+      $("pixValSub").textContent = pix.resto>0 ? `Sinal de 50% da encomenda. Restante de ${brl(pix.resto)} na ${pix.modo==="entrega"?"entrega":"retirada"}.` : "Valor total do pedido.";
+      $("pixKeyLbl").textContent = `Chave Pix (${STORE.pix_tipo||"chave"})`;
+      $("pixKey").textContent = fmtPixKey(STORE.chave_pix, STORE.pix_tipo);
+      $("pixName").textContent = STORE.pix_titular || "";
+      $("pixSend").href = waLink(`Olá! Segue o comprovante do Pix de ${brl(pix.agora)} do pedido${num?` nº ${num}`:""}.`);
+    }
+  }
   $("pedido").scrollIntoView({block:"start"});
 }
+$("pixCopy").onclick = async e=>{
+  const b = e.currentTarget, raw = String(STORE.chave_pix||"").trim(), key = /^(CNPJ|CPF|Celular)$/i.test(STORE.pix_tipo||"") ? raw.replace(/[^\d+]/g,"") : raw;
+  try{ await navigator.clipboard.writeText(key); b.textContent = "Copiada!"; }
+  catch(_){ const r = document.createRange(); r.selectNodeContents($("pixKey")); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r); b.textContent = "Selecionada"; }
+  setTimeout(()=>b.textContent="Copiar", 1800);
+};
 $("newOrder").onclick = () => { try{ localStorage.removeItem("ii-last"); }catch(e){} $("doneBox").hidden = true; $("orderGrid").hidden = false; goTo("#cardapio"); };
 
 let sending = false;
 $("sendBtn").addEventListener("click", async ()=>{
   if(sending || !validate()) return;
   $("fallbackBtn").hidden = true;
-  if(!ONLINE){ finish(null, buildMessage()); return; }
+  if(!ONLINE){ finishWhatsApp(buildMessage()); return; }
   sending = true; $("sendBtn").disabled = true; $("sendLbl").textContent = "Enviando pedido…";
   try{
     const { data, error } = await SB.rpc("criar_pedido", { p: payload() });
@@ -1042,20 +1127,14 @@ $("sendBtn").addEventListener("click", async ()=>{
       }
       throw error;
     }
-    finish(data.numero, buildMessage(data.numero));
+    finish(data.numero);
   }catch(e){
-    flashErr("Não conseguimos registrar o pedido agora. Você pode enviar direto pelo WhatsApp.");
+    flashErr("Não conseguimos registrar o pedido agora. Tente de novo ou envie pelo WhatsApp.");
     const fb = $("fallbackBtn"); fb.hidden = false; fb.href = waLink(buildMessage());
-    fb.onclick = ()=>{ setTimeout(()=>{ cart.length=0; saveCart(); refresh(); showDone(null, fb.href); }, 300); };
+    fb.onclick = ()=>{ setTimeout(()=>{ cart.length=0; saveCart(); refresh(); showDone(null, "", fb.href); }, 300); };
   }finally{
-    sending = false; $("sendBtn").disabled = false; $("sendLbl").textContent = "Enviar pedido pelo WhatsApp";
+    sending = false; $("sendBtn").disabled = false; $("sendLbl").textContent = "Confirmar pedido";
   }
-});
-$("copyBtn").addEventListener("click", async e=>{
-  const b = e.currentTarget;
-  try{ await navigator.clipboard.writeText(buildMessage()); b.textContent = "Copiado"; }
-  catch(_){ const r = document.createRange(); r.selectNodeContents($("preview")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selecionado, copie com Ctrl+C"; }
-  setTimeout(()=>b.textContent="Copiar mensagem",1800);
 });
 function refresh(){ renderBar(true); renderOrder(); saveCart(); }
 
@@ -1138,7 +1217,7 @@ route();
   try{ await loadData(); }
   catch(e){ console.warn("Cardápio de reserva:", e); MENU = FALLBACK; }
   renderMenu(); fillStore(); renderBar(false); renderOrder();
-  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) { $("orderGrid").hidden = true; $("doneBox").hidden = false; $("doneTitle").textContent = last.num?`Pedido nº ${last.num} registrado!`:"Pedido pronto!"; $("doneWa").href = last.link; } }catch(e){}
+  try{ const last = JSON.parse(localStorage.getItem("ii-last")||"null"); if(last && Date.now()-last.at < 30*60*1000 && !cart.length) showDone(last.num, last.fone||"", last.link, last.pix); }catch(e){}
   if(isMenuHash(location.hash) && location.hash !== "#cardapio") route();
 })();
 </script>

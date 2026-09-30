@@ -10,9 +10,22 @@ Painel: https://iarlaingridpadaria.com.br/admin/
   NUNCA coloque a "Secret key" nem a "service_role".
 
 Estrutura
-  index.html          site (cardápio + pedido pelo WhatsApp)
+  index.html          site (cardápio + pedido confirmado no próprio site)
   admin/index.html    painel da loja (login da Iarla)
   config.js           endereço e chave pública do banco
   img/                fotos iniciais e logos
   .github/workflows/  acesso diário automático (evita pausa do Supabase grátis)
   _headers, robots.txt  segurança e ocultar o painel do Google
+
+Pedidos, alerta e impressão (versão 4)
+  - O cliente confirma o pedido no site; ele chega no painel na hora.
+  - O painel toca um alerta até alguém abrir o pedido.
+  - No computador da loja: Pedidos > Impressora > ligar "Imprimir
+    pedidos novos automaticamente" e escolher a impressora térmica.
+    (vale só para aquele computador)
+  - Precisa do programa QZ Tray 2.2.6 aberto no computador da loja,
+    com o arquivo override.crt na pasta do QZ Tray.
+  supabase/impressao-e-alertas.sql     rodar uma vez no SQL Editor
+  supabase/functions/qz-sign/index.ts  Edge Function que assina a impressão
+    secret QZ_PRIVATE_KEY = chave privada (NUNCA no GitHub)
+
