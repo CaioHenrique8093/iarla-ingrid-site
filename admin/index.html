@@ -634,7 +634,7 @@ function openOrder(id){
   }[o.status];
   openSheet({title:`Pedido #${o.num}`, body:`
     <div class="row between wrapx"><span class="pill p-${o.status}">${STATUS[o.status]}</span><span class="muted small">Recebido ${fmtWhen(o.created).toLowerCase()}</span></div>
-    <ul class="lines">${o.items.map(i=>`<li><span>${i.qty}x ${esc(i.label)}${i.detail?`<span class="d">${esc(i.detail)}</span>`:""}</span><b>${brl(i.qty*i.price)}</b></li>`).join("")}
+    <ul class="lines">${o.items.map(i=>`<li><span>${i.qty}x ${esc(i.label)}${i.detail?`<span class="d">${esc(i.detail)}</span>`:""}${comboOf(i).length?`<span class="d">${comboOf(i).map(esc).join(" · ")}</span>`:""}</span><b>${brl(i.qty*i.price)}</b></li>`).join("")}
       ${o.mode==="entrega"?`<li><span>Entrega · ${esc(o.bairro)}</span><b>${o.fee==null?"a combinar":brl(o.fee)}</b></li>`:""}</ul>
     <div class="total"><span>Total</span><span>${brl(o.total)}${o.mode==="entrega"&&o.fee==null?" + taxa":""}</span></div>
     <dl class="kv">
@@ -1231,6 +1231,8 @@ function whenLabel(iso){
 }
 const DIA_CHEIO = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 function dataCheia(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-").map(Number); return `${DIA_CHEIO[new Date(y,m-1,d).getDay()]}, ${String(d).padStart(2,"0")}/${String(m).padStart(2,"0")}`; }
+/* o que vem no combo (do cadastro do produto), para a cozinha */
+function comboOf(i){ const p = DB.products.find(x=>x.id===i.pid); return p && (p.items||[]).length ? p.items : []; }
 function comandaHTML(o){
   const ent = o.mode==="entrega";
   const hr = '<div style="border-top:2px dashed #000;margin:8px 0"></div>';
@@ -1245,6 +1247,7 @@ function comandaHTML(o){
       <td style="vertical-align:top">
         <div style="font-size:17px;font-weight:900;line-height:1.2">${i.qty}x ${esc(i.label)}</div>
         ${i.detail?`<div style="font-size:14px;font-weight:700;margin-top:1px">${esc(i.detail)}</div>`:""}
+        ${comboOf(i).length?`<div style="font-size:14px;font-weight:700;margin-top:3px;line-height:1.35">${i.qty>1?`<div style="font-size:12px">CADA COMBO LEVA:</div>`:""}${comboOf(i).map(c=>`<div>• ${esc(c)}</div>`).join("")}</div>`:""}
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:6px;font-size:13px">${brl(i.qty*i.price)}</td>
     </tr></table>`).join("");
