@@ -517,7 +517,7 @@ h1 .script{display:block;font-family:var(--script);font-weight:400;color:var(--c
       <p class="loading" id="loading">Carregando cardápio…</p>
       <div class="notice pronta-note" id="prontaNote" hidden>
         <div class="lines">
-          <p id="noteP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h6.5l2-5h-4l-2-3H8M15 6h3l2 6M3 12h5l2 5"/></svg><span><strong>Pedidos para o mesmo dia? Pronta-entrega das 13:30 às 18:30h</strong><br>Faça seu pedido pelo cardápio e escolha o horário que deseja entre 13:30 e 18:30h.<br>Tempo estimado de entrega: <strong>40 a 90 minutos</strong>.<br>Precisa em outro horário no mesmo dia? <a data-wa-manha href="#">Fale com a gente no WhatsApp</a> para verificar a disponibilidade.</span></p>
+          <p id="noteP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M8.5 17h6.5l2-5h-4l-2-3H8M15 6h3l2 6M3 12h5l2 5"/></svg><span><strong>Pedidos para o mesmo dia? Pronta-entrega das 08:30h às 18:30h</strong><br>Faça seu pedido pelo cardápio e escolha o horário que deseja entre 08:30 e 18:30h.<br>Tempo estimado de entrega: <strong>40 a 90 minutos</strong>.</span></p>
           <p id="noteE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M4 16c2 1 3 1 4 0s3-1 4 0 3 1 4 0 3-1 4 0M12 12V8M12 5.5v-.01"/></svg><span id="noteETxt"></span></p>
         </div>
       </div>
@@ -823,7 +823,7 @@ function optGroup(item, key, legend, values, disabled=[]){
 function flavMap(x){ const m = x.estoque_sabores; return x.estoque_ativo && m && typeof m==="object" && !Array.isArray(m) && (x.sabores||[]).length ? m : null; }
 function flavQty(it, f){ return Math.max(0, +((it.flav||{})[f]||0)); }
 function unitsInCart(pid, sabor){ return cart.filter(c=>c.pid===pid && (sabor===undefined || c.sabor===sabor)).reduce((a,c)=>a+c.units*c.qty,0); }
-/* "pronta" = tem estoque (sai no mesmo dia, 13:30–18:30); "enc" = sob encomenda
+/* "pronta" = tem estoque (sai no mesmo dia, 08:30–18:30); "enc" = sob encomenda
    (sem limite de estoque, ou estoque zerado com "aceitar encomenda ao zerar") */
 function itemKind(it, sabor){
   if(it.flav){
@@ -910,7 +910,7 @@ function renderMenu(){
   const vis = Object.values(byId).filter(it=>!it.soldOut), temP = vis.some(it=>itemKind(it)==="pronta"),
     temE = vis.some(it=>itemKind(it)==="enc" || (it.flav && it.encZero && it.flavors.some(f=>flavQty(it,f)<=0)));
   const ant = STORE.antecedencia_dias||0;
-  $("noteETxt").innerHTML = `<strong>Encomendas${ant?`: com ${ant} dia${ant>1?"s":""} de antecedência`:""}</strong><br>Para confirmar, pague <strong>50% do valor</strong> no Pix e envie o comprovante no nosso WhatsApp.`;
+  $("noteETxt").innerHTML = `<strong>Encomendas</strong><br>Para confirmar, pague <strong>50% do valor</strong> no Pix e envie o comprovante no nosso WhatsApp.`;
   $("noteP").hidden = !temP; $("noteE").hidden = !temE; $("prontaNote").hidden = !(temP||temE);
 }
 $("groups").addEventListener("change", e=>{
@@ -1095,9 +1095,10 @@ function buildMessage(num){
 }
 const waLink = text => `https://wa.me/${STORE.whatsapp}${text?`?text=${encodeURIComponent(text)}`:""}`;
 
-/* pronta-entrega: no mesmo dia, das 13:30 às 18:30 (manhã só combinando no WhatsApp) */
-const PRONTA = { de:"13:30", ate:"18:30" };
-const MANHA_MSG = "Olá! Preciso de um pedido para hoje fora do horário das 13:30 às 18:30. Tem disponibilidade?";
+/* pronta-entrega: das 08:30 às 18:30 (ou a partir da abertura da loja, se abrir depois) */
+const PRONTA = { de:"08:30", ate:"18:30" };
+function prontaDe(d){ const h = d && STORE.horarios[dow(d)]; return h && h.aberto && h.de > PRONTA.de ? h.de : PRONTA.de; }
+const MANHA_MSG = "Olá! Preciso de um pedido para hoje. Tem disponibilidade?";
 function dayOpen(d){ const h = STORE.horarios[dow(d)]; return !FECH.includes(d) && h && h.aberto; }
 function prontaMinDate(){
   const n = nowSobral(); let d = n.date;
@@ -1108,8 +1109,9 @@ function prontaMinDate(){
 function setWhen(){
   const k = cartKind(), n = nowSobral(), box = $("whenNotice");
   if(k==="pronta"){
-    $("data").min = prontaMinDate(); $("hora").min = PRONTA.de; $("hora").max = PRONTA.ate;
-    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>13:30 às 18:30</strong>. Tempo estimado de entrega: 40 a 90 minutos. Precisa em outro horário hoje? <a href="${waLink(MANHA_MSG)}" target="_blank" rel="noopener">Fale com a gente no WhatsApp</a> para verificar a disponibilidade.`;
+    const de = prontaDe($("data").value || prontaMinDate());
+    $("data").min = prontaMinDate(); $("hora").min = de; $("hora").max = PRONTA.ate;
+    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>${de} às 18:30</strong>. Tempo estimado de entrega: 40 a 90 minutos.`;
     box.hidden = false;
   } else {
     $("data").min = addDays(n.date, STORE.antecedencia_dias||0); $("hora").min = "08:00"; $("hora").max = "18:00";
@@ -1125,7 +1127,7 @@ function scheduleError(){
     if(d < hoje) return "Escolha uma data a partir de hoje.";
     if(d === hoje && n.time >= PRONTA.ate) return "A pronta-entrega de hoje vai até as 18:30. Escolha outro dia.";
     if(!dayOpen(d)) return FECH.includes(d) ? "A loja estará fechada nessa data. Escolha outro dia." : `Não abrimos aos ${DIAS[dow(d)].toLowerCase()}s. Escolha outro dia.`;
-    if(t && (t < PRONTA.de || t > PRONTA.ate)) return "Pronta-entrega: escolha um horário das 13:30 às 18:30. Para a manhã, fale com a gente no WhatsApp.";
+    if(t && (t < prontaDe(d) || t > PRONTA.ate)) return `Pronta-entrega: escolha um horário das ${prontaDe(d)} às 18:30.`;
     if(t && d === hoje && t <= n.time) return "Escolha um horário a partir de agora.";
     return "";
   }
