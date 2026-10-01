@@ -839,7 +839,7 @@ function stockLeft(it, sabor){
 function cartKind(){ return cart.length ? (cart[0].kind||"enc") : null; }
 function stockChip(it){
   if(it.soldOut) return `<span class="info bad">Esgotado</span>`;
-  if(itemKind(it)==="pronta") return `<span class="info ok">Pronta-entrega</span>` + (!it.flav && it.stock<=5 ? `<span class="info warn">Restam ${it.stock}${it.sizes.length?" un.":""}</span>` : "");
+  if(itemKind(it)==="pronta") return `<span class="info ok">Pronta-entrega</span>` + (!it.flav && it.stock<=5 ? `<span class="info warn">Restam ${it.stock}${it.sizes.length?(it.stock>1?" pacotes":" pacote"):""}</span>` : "");
   if(it.stock!=null && it.encZero) return `<span class="info">Sob encomenda</span>`;
   return "";
 }
@@ -852,7 +852,7 @@ function cardHTML(item){
     else opts += optGroup(item,"sabor","Sabor",item.flavors.map(esc));
   }
   if(item.sizes.length){
-    const dis = item.sizes.map(([q])=>!item.flav && itemKind(item)==="pronta" && q>item.stock);
+    const dis = item.sizes.map(()=>false); /* estoque em pacotes: qualquer tamanho cabe se tem 1 */
     opts += optGroup(item,"qtd","Quantidade",item.sizes.map(([q,p])=>`${q} un. <b>${brl(p)}</b>`),dis);
     const first = Math.max(0, dis.findIndex(d=>!d));
     price = `<span class="price" data-price>${brl(item.sizes[first][1])}</span>`;
@@ -931,7 +931,7 @@ function addToCart(id, card){
     if(sabor) detail.push(sabor);
     if(it.askFlavor) detail.push("sabor a combinar");
     const q = card.querySelector(`input[name="${id}-qtd"]:checked`);
-    if(q){ size = +q.value; const [n,p] = it.sizes[size]; label += ` (${n} un.)`; price = p; units = n; }
+    if(q){ size = +q.value; const [n,p] = it.sizes[size]; label += ` (${n} un.)`; price = p; } /* estoque conta pacotes: cada pacote = 1 */
     if(it.serve && it.serve!=="Individual") detail.unshift(it.serve.toLowerCase());
   }
   const kind = itemKind(it, it.flav ? sabor : undefined), ck = cartKind();
@@ -941,8 +941,8 @@ function addToCart(id, card){
     : "Seu pedido é de encomenda. Itens de pronta-entrega vão em um pedido separado."); return false; }
   const sb = it.flav ? sabor : undefined, left = stockLeft(it, sb), disp = it.flav ? flavQty(it, sabor) : it.stock;
   if(left < units){ stockMsg(card, it.encZero
-    ? `Só temos ${disp}${it.flav?` de ${sabor}`:""} a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.`
-    : (left <= 0 ? `Você já adicionou todo o estoque disponível${it.flav?` de ${sabor}`:""}.` : `Só restam ${left} unidade(s)${it.flav?` de ${sabor}`:""}.`)); return false; }
+    ? `Só temos ${disp}${it.sizes.length?(disp>1?" pacotes":" pacote"):""}${it.flav?` de ${sabor}`:""} a pronta-entrega. Para mais, faça um pedido por encomenda separado.`
+    : (left <= 0 ? `Você já adicionou todo o estoque disponível${it.flav?` de ${sabor}`:""}.` : `Só restam ${left} ${it.sizes.length?"pacote(s)":"unidade(s)"}${it.flav?` de ${sabor}`:""}.`)); return false; }
   const key = id+"|"+size+"|"+(sabor||"");
   const found = cart.find(c=>c.key===key);
   if(found) found.qty++; else cart.push({key,pid:id,size,sabor,label,detail,price,units,qty:1,kind});
@@ -962,7 +962,7 @@ $("groups").addEventListener("click", e=>{
   clearTimeout(b._t); b._t = setTimeout(()=>{ b.classList.remove("done"); b.innerHTML = ICON_PLUS+"Adicionar"; },1400);
 });
 function saveCart(){ try{ localStorage.setItem("ii-cart2", JSON.stringify(cart)); }catch(e){} }
-function loadCart(){ try{ const c = JSON.parse(localStorage.getItem("ii-cart2")||"[]"); if(Array.isArray(c)) c.forEach(x=>x&&x.pid&&cart.push(x)); }catch(e){} }
+function loadCart(){ try{ const c = JSON.parse(localStorage.getItem("ii-cart2")||"[]"); if(Array.isArray(c)) c.forEach(x=>{ if(x&&x.pid){ if(x.size!=null) x.units=1; cart.push(x); } }); }catch(e){} }
 
 /* ---------- pedido ---------- */
 function modo(){ return document.querySelector('input[name="modo"]:checked')?.value || "retirada"; }
@@ -1051,7 +1051,7 @@ $("lines").addEventListener("click", e=>{
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.inc){ const c = cart[+t.dataset.inc], it = byId[c.pid], sb = it&&it.flav ? c.sabor : undefined;
     if(it && stockLeft(it, sb) < c.units){ const disp = it.flav ? flavQty(it, c.sabor) : it.stock, nm = it.flav ? `${it.name} (${c.sabor})` : it.name;
-      return flashErr(it.encZero ? `Só temos ${disp} de ${nm} a pronta-entrega. Para mais, faça um pedido por encomenda separado.` : `Só restam ${disp} unidade(s) de ${nm}.`); }
+      return flashErr(it.encZero ? `Só temos ${disp} de ${nm} a pronta-entrega. Para mais, faça um pedido por encomenda separado.` : `Só restam ${disp} ${it.sizes.length?"pacote(s)":"unidade(s)"} de ${nm}.`); }
     c.qty++; }
   if(t.dataset.dec){ const c = cart[+t.dataset.dec]; c.qty--; if(c.qty<1) cart.splice(+t.dataset.dec,1); }
   if(t.dataset.rm) cart.splice(+t.dataset.rm,1);

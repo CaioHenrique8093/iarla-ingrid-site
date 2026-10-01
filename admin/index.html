@@ -659,7 +659,7 @@ function prodRow(p, i, n){
   const status = !p.active?'<span class="pill p-oculto">Oculto</span>': p.soldOut||(p.stockOn&&p.stock===0&&!p.encZero)?'<span class="pill p-esgotado">Esgotado</span>': "";
   const zeroEnc = p.stockOn && p.stock===0 && p.encZero;
   const sk = !p.stockOn ? ["", "Encomenda", "Sem limite", ""]
-    : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.stock===1?" unidade":" unidades"),
+    : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.sizes?.length?(p.stock===1?" pacote":" pacotes"):(p.stock===1?" unidade":" unidades")),
        p.encZero?"Ao zerar: vira encomenda":"Ao zerar: esgota"];
   const fc = flavClean(p), flavLine = fc ? Object.entries(fc).map(([f,n])=>`${esc(f)} ${n}`).join(" · ") : "";
   const price = p.sizes?.length ? `a partir de ${brl(Math.min(...p.sizes.map(s=>s[1])))}` : brl(p.price);
@@ -733,7 +733,7 @@ function flavRows(flavors, map){
     <span class="stock"><button type="button" data-fs="-1" aria-label="Diminuir ${esc(f)}">−</button><input class="stk-in" type="number" inputmode="numeric" min="0" value="${Math.max(0,parseInt((map||{})[f])||0)}" aria-label="Quantidade de ${esc(f)}"><button type="button" data-fs="1" aria-label="Aumentar ${esc(f)}">+</button></span></div>`).join("");
 }
 function stockFields(d){
-  const unit = d.sizes?.length ? "unidades (ex.: docinhos avulsos)" : "unidades";
+  const unit = d.sizes?.length ? `pacotes (de ${d.sizes.map(s=>s[0]).join(" ou ")} un.)` : "unidades";
   const canFlav = DB.flavCol && (d.flavors||[]).length>1, byFlav = canFlav && !!d.flav;
   return `<div class="card" style="background:var(--surface-2);display:grid;gap:12px">
     <span class="lbl" style="font-size:14px;font-weight:600">Estoque</span>
@@ -750,7 +750,7 @@ function stockFields(d){
       <div id="stkFlav" style="display:grid;gap:8px;flex-basis:100%" ${byFlav?"":"hidden"}>${canFlav?flavRows(d.flavors, d.flav):""}</div>
       ${DB.encCol?`<label class="row" style="gap:10px;flex-basis:100%;cursor:pointer"><input type="checkbox" id="f-enc0" ${d.encZero?"checked":""} style="width:20px;height:20px;accent-color:var(--brown)"><span><b>Quando zerar, aceitar por encomenda</b><br><span class="muted small">Em vez de “Esgotado”, o site passa a vender sob encomenda.</span></span></label>`:""}
     </div>
-    <span class="hint small muted">Com quantidade, o site mostra “Pronta-entrega” e “Restam X” (entrega no mesmo dia, 13:30 às 18:30) e não deixa pedir mais do que tem. Ao zerar: “Esgotado”, ou encomenda se marcado acima. Cancelou um pedido? O estoque volta sozinho.</span>
+    <span class="hint small muted">Com quantidade, o site mostra “Pronta-entrega” e “Restam X” (das 08:30 às 18:30) e não deixa pedir mais do que tem. Ao zerar: “Esgotado”, ou encomenda se marcado acima. Cancelou um pedido? O estoque volta sozinho.</span>
   </div>`;
 }
 function bindStockFields(s){
