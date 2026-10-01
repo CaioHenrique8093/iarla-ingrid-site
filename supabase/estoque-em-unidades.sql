@@ -1,8 +1,9 @@
 -- =====================================================================
--- Iarla Ingrid · estoque em PACOTES para produtos vendidos em pacotes
--- (ex.: Salgados fritos 50 un. / 100 un.: estoque 11 = 11 pacotes;
---  cada pacote vendido, de qualquer tamanho, tira 1 do estoque)
--- Inclui a pronta-entrega das 08:30 às 18:30 (substitui horario-pronta-0830.sql).
+-- Iarla Ingrid · estoque em UNIDADES SOLTAS (substitui estoque-por-pacote.sql)
+-- Ex.: Salgados fritos com 500 no estoque: pediu 50, ficam 450; pediu 100, ficam 350.
+-- Se sobrar menos que o menor pacote (ex.: 30), o produto fica esgotado
+-- (ou sob encomenda, se marcado "Quando zerar, aceitar por encomenda").
+-- Inclui a pronta-entrega das 08:30 às 18:30.
 -- Rodar no Supabase: SQL Editor > New query > colar > Run. Pode rodar de novo.
 -- =====================================================================
 create or replace function public.criar_pedido(p jsonb)
@@ -39,6 +40,7 @@ declare
   v_tipo     text;          -- 'pronta' ou 'enc'
   v_tipo_it  text;
   v_temfs    boolean;       -- estoque separado por sabor
+  v_min      int;           -- menor pacote (1 se o produto não tem tamanhos)
   v_fs       int;
   pr_de      text := '08:30';
   pr_ate     constant text := '18:30';
@@ -90,7 +92,7 @@ begin
       v_idx := coalesce((it->>'tamanho')::int, -1);
       if v_idx < 0 or v_idx >= jsonb_array_length(prod.tamanhos) then raise exception 'Escolha a quantidade de %.', prod.nome; end if;
       v_preco := (prod.tamanhos->v_idx->>'preco')::numeric;
-      v_unid  := v_qtd;   -- estoque conta pacotes
+      v_unid  := v_qtd * (prod.tamanhos->v_idx->>'qtd')::int;
       v_nome_it := prod.nome || ' (' || (prod.tamanhos->v_idx->>'qtd') || ' un.)';
     else
       v_preco := prod.preco;
@@ -108,16 +110,19 @@ begin
       v_det := trim(both ' · ' from lower(prod.porcao) || ' · ' || v_det);
     end if;
 
+    -- o estoque conta unidades soltas; menos que o menor pacote = não dá para vender a pronta-entrega
+    v_min := coalesce((select min((t->>'qtd')::int) from jsonb_array_elements(prod.tamanhos) t where (t->>'qtd')::int > 0), 1);
+
     -- tipo do item (com estoque por sabor, vale a quantidade do sabor escolhido)
     v_temfs := prod.estoque_ativo and jsonb_typeof(prod.estoque_sabores) = 'object'
                and coalesce(array_length(prod.sabores, 1), 0) > 1 and v_sabor is not null;
     if v_temfs then
       v_fs := greatest(coalesce((prod.estoque_sabores->>v_sabor)::int, 0), 0);
-      if v_fs > 0 then v_tipo_it := 'pronta';
+      if v_fs >= v_min then v_tipo_it := 'pronta';
       elsif prod.encomenda_ao_zerar then v_tipo_it := 'enc';
       else raise exception 'O sabor % de % acabou. Escolha outro sabor.', v_sabor, prod.nome;
       end if;
-    elsif prod.estoque_ativo and prod.estoque > 0 then
+    elsif prod.estoque_ativo and prod.estoque >= v_min then
       v_tipo_it := 'pronta';
     elsif prod.estoque_ativo and not prod.encomenda_ao_zerar then
       raise exception '% está esgotado.', prod.nome;
@@ -132,7 +137,7 @@ begin
     if v_tipo_it = 'pronta' and v_temfs then
       if v_fs < v_unid then
         if prod.encomenda_ao_zerar then
-          raise exception 'Só temos % de % (%) a pronta-entrega. Para mais, faça um pedido por encomenda separado.', v_fs, prod.nome, v_sabor;
+          raise exception 'Só temos % de % (%) a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.', v_fs, prod.nome, v_sabor;
         end if;
         raise exception 'Estoque insuficiente de % (%): restam %.', prod.nome, v_sabor, v_fs;
       end if;
@@ -142,7 +147,7 @@ begin
     elsif v_tipo_it = 'pronta' then
       if prod.estoque < v_unid then
         if prod.encomenda_ao_zerar then
-          raise exception 'Só temos % de % a pronta-entrega. Para mais, faça um pedido por encomenda separado.', prod.estoque, prod.nome;
+          raise exception 'Só temos % de % a pronta-entrega. Para mais unidades, faça um pedido por encomenda separado.', prod.estoque, prod.nome;
         end if;
         raise exception 'Estoque insuficiente de % (restam %).', prod.nome, prod.estoque;
       end if;
@@ -203,10 +208,12 @@ begin
                             'taxa', v_ped.taxa, 'total', v_ped.total, 'bairro', v_ped.bairro, 'tipo', v_tipo);
 end $function$;
 
--- pedidos já feitos: guarda a baixa em pacotes, para o cancelamento devolver certo
-update pedido_itens i set unidades_estoque = i.qtd
+-- pedidos feitos enquanto o estoque contava pacotes: volta a guardar em unidades
+update pedido_itens i
+   set unidades_estoque = i.qtd * (substring(i.nome from '\((\d+) un\.\)'))::int
   from produtos p
  where p.id = i.produto_id and jsonb_array_length(p.tamanhos) > 0
-   and i.unidades_estoque > i.qtd;
+   and i.unidades_estoque > 0 and i.unidades_estoque = i.qtd
+   and i.nome ~ '\(\d+ un\.\)';
 
-select 'ok' as estoque_por_pacote;
+select 'ok' as estoque_em_unidades;

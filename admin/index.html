@@ -659,7 +659,7 @@ function prodRow(p, i, n){
   const status = !p.active?'<span class="pill p-oculto">Oculto</span>': p.soldOut||(p.stockOn&&p.stock===0&&!p.encZero)?'<span class="pill p-esgotado">Esgotado</span>': "";
   const zeroEnc = p.stockOn && p.stock===0 && p.encZero;
   const sk = !p.stockOn ? ["", "Encomenda", "Sem limite", ""]
-    : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.sizes?.length?(p.stock===1?" pacote":" pacotes"):(p.stock===1?" unidade":" unidades")),
+    : [zeroEnc?" enc":p.stock===0?" zero":p.stock<=3?" low":" on", "Pronta-entrega", zeroEnc?"0 · agora sob encomenda":p.stock===0?"0 · esgotado":p.stock+(p.stock===1?" unidade":" unidades")+(p.sizes?.length && p.stock<Math.min(...p.sizes.map(s=>s[0]))?` · menos que 1 pacote (${p.encZero?"site vende sob encomenda":"site mostra esgotado"})`:""),
        p.encZero?"Ao zerar: vira encomenda":"Ao zerar: esgota"];
   const fc = flavClean(p), flavLine = fc ? Object.entries(fc).map(([f,n])=>`${esc(f)} ${n}`).join(" · ") : "";
   const price = p.sizes?.length ? `a partir de ${brl(Math.min(...p.sizes.map(s=>s[1])))}` : brl(p.price);
@@ -733,7 +733,7 @@ function flavRows(flavors, map){
     <span class="stock"><button type="button" data-fs="-1" aria-label="Diminuir ${esc(f)}">−</button><input class="stk-in" type="number" inputmode="numeric" min="0" value="${Math.max(0,parseInt((map||{})[f])||0)}" aria-label="Quantidade de ${esc(f)}"><button type="button" data-fs="1" aria-label="Aumentar ${esc(f)}">+</button></span></div>`).join("");
 }
 function stockFields(d){
-  const unit = d.sizes?.length ? `pacotes (de ${d.sizes.map(s=>s[0]).join(" ou ")} un.)` : "unidades";
+  const unit = d.sizes?.length ? `unidades soltas (vende em pacotes de ${d.sizes.map(s=>s[0]).join(" ou ")}). Ex.: 500; pediu 50, ficam 450` : "unidades";
   const canFlav = DB.flavCol && (d.flavors||[]).length>1, byFlav = canFlav && !!d.flav;
   return `<div class="card" style="background:var(--surface-2);display:grid;gap:12px">
     <span class="lbl" style="font-size:14px;font-weight:600">Estoque</span>
