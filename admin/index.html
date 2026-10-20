@@ -252,6 +252,10 @@ select.in{background-image:linear-gradient(45deg,transparent 50%,currentColor 50
 .hour .times{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .hour .times .in{min-height:44px;background:var(--surface)}
 .hour.closed .times{display:none}
+.pausa{margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:14px;display:grid;gap:10px}
+.pausa .times{display:flex;gap:8px;align-items:center}
+.pausa .times .in{min-height:44px}
+.pausa.off .times{opacity:.45;pointer-events:none}
 .closures{display:grid;gap:8px}
 .closure{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
 .closure b{font-variant-numeric:tabular-nums}
@@ -467,7 +471,8 @@ function storeFrom(c, f){
   return { whatsapp:fmtPhone(c.whatsapp), instagram:c.instagram, address:c.endereco, maps:c.maps_url,
     hours:c.horarios.map((h,i)=>({d:DIAS[i],open:h.aberto,from:h.de,to:h.ate})), closures:f.map(x=>({id:x.id,date:x.data,reason:x.motivo})),
     pay:Object.assign({"Pix":false,"Cartão":false,"Dinheiro":false}, c.pagamentos), lead:c.antecedencia_dias, banner:{on:c.aviso_ativo,text:c.aviso_texto},
-    pixKey:c.chave_pix ?? "65815467000135", pixType:c.pix_tipo ?? "CNPJ", pixName:c.pix_titular ?? "Iarla Ingrid Padaria e Doceria", pixCols: "chave_pix" in c };
+    pixKey:c.chave_pix ?? "65815467000135", pixType:c.pix_tipo ?? "CNPJ", pixName:c.pix_titular ?? "Iarla Ingrid Padaria e Doceria", pixCols: "chave_pix" in c,
+    lunch:{on:!!c.pausa_ativa, from:c.pausa_de||"12:00", to:c.pausa_ate||"13:00"}, lunchCols: "pausa_ativa" in c };
 }
 
 async function loadCatalog(){
@@ -1043,6 +1048,11 @@ function renderStore(){
         <div class="hours">${S.hours.map((h,i)=>`<div class="hour${h.open?"":" closed"}" data-h="${i}">
           <b>${h.d}</b><label class="sw"><input type="checkbox" data-open ${h.open?"checked":""}><span class="tr"></span><span data-lbl>${h.open?"Aberto":"Fechado"}</span></label>
           <div class="times"><input class="in" type="time" value="${h.from}" data-from aria-label="Abre às"><span class="muted">às</span><input class="in" type="time" value="${h.to}" data-to aria-label="Fecha às"></div></div>`).join("")}</div>
+        <div class="pausa${S.lunch.on?"":" off"}" id="lunchBox">
+          <label class="sw"><input type="checkbox" id="lunchOn" ${S.lunch.on?"checked":""}><span class="tr"></span><b>Pausa para almoço</b></label>
+          <div class="times"><input class="in" type="time" id="lunchFrom" value="${S.lunch.from}" aria-label="Pausa de"><span class="muted">às</span><input class="in" type="time" id="lunchTo" value="${S.lunch.to}" aria-label="Pausa até"></div>
+          <span class="hint">Vale para todos os dias abertos. O cliente continua fazendo pedidos, mas não consegue marcar entrega ou retirada nesse horário.${S.lunchCols?"":" <b>Rode o pausa-almoco.sql no Supabase para ativar.</b>"}</span>
+        </div>
       </section>
       <div style="display:grid;gap:16px">
         <section class="card"><h2>Fechamentos especiais</h2>
@@ -1094,14 +1104,19 @@ function renderStore(){
   $("#clAdd").onclick=()=>{ const d=$("#clDate").value; if(!d){ $("#clDate").focus(); toast("Escolha a data."); return; } if(S.closures.some(c=>c.date===d)){ toast("Essa data já está marcada."); return; } S.closures.push({id:uid(),date:d,reason:$("#clReason").value.trim()||"Fechado",isNew:true}); $("#clDate").value=""; $("#clReason").value=""; drawCl(); toast("Fechamento adicionado · toque em Salvar alterações"); };
   $$("[data-lead]").forEach(b=>b.onclick=()=>{ S.lead=Math.min(30,Math.max(0,S.lead+ +b.dataset.lead)); $("#leadOut").textContent=leadTxt(S.lead); });
   $$("[data-pay]").forEach(c=>c.onchange=()=>S.pay[c.dataset.pay]=c.checked);
+  $("#lunchOn").onchange=e=>{ S.lunch.on=e.target.checked; $("#lunchBox").classList.toggle("off",!S.lunch.on); };
+  $("#lunchFrom").onchange=e=>S.lunch.from=e.target.value; $("#lunchTo").onchange=e=>S.lunch.to=e.target.value;
   $("#chgPass").onclick = newPasswordSheet;
   $("#saveStore").onclick=e=>busy(e.currentTarget, async()=>{
     if(!Object.values(S.pay).some(Boolean)){ toast("Deixe pelo menos uma forma de pagamento ligada."); return; }
     if(S.hours.some(h=>h.open && (!h.from || !h.to || h.from>=h.to))){ toast("Confira os horários: o fechamento precisa ser depois da abertura."); return; }
+    if(S.lunch.on && (!S.lunch.from || !S.lunch.to || S.lunch.from>=S.lunch.to)){ toast("Confira a pausa para almoço: o fim precisa ser depois do início."); return; }
+    if(S.lunch.on && !S.lunchCols){ toast("A pausa para almoço precisa do pausa-almoco.sql rodado no Supabase."); return; }
     const wa = $("#sWa").value.replace(/\D/g,""); if(wa.length<10||wa.length>13){ toast("Confira o número do WhatsApp com DDD."); $("#sWa").focus(); return; }
     const patch = { whatsapp: wa.length<=11 ? "55"+wa : wa, instagram:$("#sIg").value.trim(), endereco:$("#sAd").value.trim(), maps_url:$("#sMp").value.trim(),
       horarios:S.hours.map(h=>({aberto:h.open,de:h.from,ate:h.to})), pagamentos:S.pay, antecedencia_dias:S.lead,
       aviso_ativo:$("#bnOn").checked, aviso_texto:$("#bnText").value.trim() };
+    if(S.lunchCols){ patch.pausa_ativa = S.lunch.on; patch.pausa_de = S.lunch.from; patch.pausa_ate = S.lunch.to; }
     if(S.pixCols){ patch.chave_pix = $("#sPixK").value.trim(); patch.pix_tipo = $("#sPixT").value; patch.pix_titular = $("#sPixN").value.trim(); }
     const removed = DB.store.closures.filter(c=>!S.closures.some(x=>x.id===c.id)).map(c=>c.id);
     const added = S.closures.filter(c=>c.isNew).map(c=>({data:c.date, motivo:c.reason}));

@@ -754,7 +754,8 @@ let STORE = {
   horarios:[{aberto:false,de:"08:00",ate:"12:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"18:00"},{aberto:true,de:"08:00",ate:"13:00"}],
   pagamentos:{"Pix":true,"Cartão":true,"Dinheiro":true}, antecedencia_dias:1,
   entrega_ativa:true, bairro_fora:"combinar", aviso_ativo:false, aviso_texto:"",
-  chave_pix:"65815467000135", pix_tipo:"CNPJ", pix_titular:"Iarla Ingrid Padaria e Doceria"
+  chave_pix:"65815467000135", pix_tipo:"CNPJ", pix_titular:"Iarla Ingrid Padaria e Doceria",
+  pausa_ativa:false, pausa_de:"12:00", pausa_ate:"13:00"
 };
 let BAIRROS = [], FECH = [], MENU = [], byId = {};
 
@@ -1103,6 +1104,11 @@ const waLink = text => `https://wa.me/${STORE.whatsapp}${text?`?text=${encodeURI
 const PRONTA = { de:"08:30", ate:"18:30" };
 function prontaDe(d){ const h = d && STORE.horarios[dow(d)]; return h && h.aberto && h.de > PRONTA.de ? h.de : PRONTA.de; }
 const MANHA_MSG = "Olá! Preciso de um pedido para hoje. Tem disponibilidade?";
+/* pausa para almoço: sem entrega/retirada nesse intervalo (qualquer dia, pronta-entrega e encomenda) */
+function pausaOn(){ return !!(STORE.pausa_ativa && STORE.pausa_de && STORE.pausa_ate && STORE.pausa_de < STORE.pausa_ate); }
+function naPausa(t){ return pausaOn() && t >= STORE.pausa_de && t < STORE.pausa_ate; }
+function pausaTxt(){ return pausaOn() ? ` Horário de almoço: <strong>${hfmt(STORE.pausa_de)} às ${hfmt(STORE.pausa_ate)}</strong>, sem entregas ou retiradas nesse intervalo.` : ""; }
+const pausaErr = () => `Das ${hfmt(STORE.pausa_de)} às ${hfmt(STORE.pausa_ate)} estamos no horário de almoço. Escolha um horário antes ou depois.`;
 function dayOpen(d){ const h = STORE.horarios[dow(d)]; return !FECH.includes(d) && h && h.aberto; }
 function prontaMinDate(){
   const n = nowSobral(); let d = n.date;
@@ -1115,13 +1121,13 @@ function setWhen(){
   if(k==="pronta"){
     const de = prontaDe($("data").value || prontaMinDate());
     $("data").min = prontaMinDate(); $("hora").min = de; $("hora").max = PRONTA.ate;
-    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>${de} às 18:30</strong>. Tempo estimado de entrega: 40 a 90 minutos.`;
+    $("whenTxt").innerHTML = `<strong>Pronta-entrega:</strong> entrega ou retirada das <strong>${de} às 18:30</strong>. Tempo estimado de entrega: 40 a 90 minutos.` + pausaTxt();
     box.hidden = false;
   } else {
     $("data").min = addDays(n.date, STORE.antecedencia_dias||0); $("hora").min = "08:00"; $("hora").max = "18:00";
     const ant = STORE.antecedencia_dias||0;
-    $("whenTxt").innerHTML = ant ? `<strong>Encomenda:</strong> com ${ant} dia${ant>1?"s":""} de antecedência.` : "";
-    box.hidden = !(k && ant);
+    $("whenTxt").innerHTML = (ant ? `<strong>Encomenda:</strong> com ${ant} dia${ant>1?"s":""} de antecedência.` : "") + pausaTxt();
+    box.hidden = !(k && (ant || pausaOn()));
   }
 }
 function scheduleError(){
@@ -1133,6 +1139,7 @@ function scheduleError(){
     if(!dayOpen(d)) return FECH.includes(d) ? "A loja estará fechada nessa data. Escolha outro dia." : `Não abrimos aos ${DIAS[dow(d)].toLowerCase()}s. Escolha outro dia.`;
     if(t && (t < prontaDe(d) || t > PRONTA.ate)) return `Pronta-entrega: escolha um horário das ${prontaDe(d)} às 18:30.`;
     if(t && d === hoje && t <= n.time) return "Escolha um horário a partir de agora.";
+    if(t && naPausa(t)) return pausaErr();
     return "";
   }
   const min = addDays(hoje, STORE.antecedencia_dias||0);
@@ -1141,6 +1148,7 @@ function scheduleError(){
   const h = STORE.horarios[dow(d)];
   if(!h || !h.aberto) return `Não abrimos aos ${DIAS[dow(d)].toLowerCase()}s. Escolha outro dia.`.replace("sábados","sábados");
   if(t && (t < h.de || t > h.ate)) return `Nesse dia atendemos das ${hfmt(h.de)} às ${hfmt(h.ate)}.`;
+  if(t && naPausa(t)) return pausaErr();
   return "";
 }
 function validate(){
@@ -1237,6 +1245,8 @@ $("sendBtn").addEventListener("click", async ()=>{
   }
 });
 function refresh(){ renderBar(true); renderOrder(); saveCart(); }
+/* avisa na hora se o cliente escolher um horário dentro do almoço */
+$("hora").addEventListener("change", ()=>{ const t = $("hora").value; if(t && naPausa(t)) flashErr(pausaErr()); });
 
 /* ---------- dados da loja na página ---------- */
 function hoursSummary(){
@@ -1254,11 +1264,12 @@ function hoursSummary(){
 function fillStore(){
   const parts = hoursSummary();
   $("hoursText").textContent = parts.map(p=>`${p.name} ${p.text}`).join(" · ");
-  $("footHours").innerHTML = parts.map(p=>`<div><dt>${esc(p.long)}</dt><dd>${p.h.aberto?`${hfmt(p.h.de)} às ${hfmt(p.h.ate)}`:"Fechado"}</dd></div>`).join("");
-  $("sendHint").textContent = "Atendemos: " + parts.filter(p=>p.h.aberto).map(p=>`${p.name.toLowerCase()}, ${hfmt(p.h.de)} às ${hfmt(p.h.ate)}`).join("; ") + ".";
+  $("footHours").innerHTML = parts.map(p=>`<div><dt>${esc(p.long)}</dt><dd>${p.h.aberto?`${hfmt(p.h.de)} às ${hfmt(p.h.ate)}`:"Fechado"}</dd></div>`).join("")
+    + (pausaOn() ? `<div><dt>Almoço</dt><dd>${hfmt(STORE.pausa_de)} às ${hfmt(STORE.pausa_ate)}</dd></div>` : "");
+  $("sendHint").textContent = "Atendemos: " + parts.filter(p=>p.h.aberto).map(p=>`${p.name.toLowerCase()}, ${hfmt(p.h.de)} às ${hfmt(p.h.ate)}`).join("; ") + "." + (pausaOn() ? ` Almoço das ${hfmt(STORE.pausa_de)} às ${hfmt(STORE.pausa_ate)}.` : "");
   // aberto agora?
   const n = nowSobral(), h = STORE.horarios[dow(n.date)], open = !FECH.includes(n.date) && h && h.aberto && n.time>=h.de && n.time<h.ate;
-  const st = $("status"); st.hidden = false; st.className = "status " + (open?"open":"closed"); st.textContent = open ? "Aberto agora" : "Fechado agora";
+  const st = $("status"); st.hidden = false; st.className = "status " + (open?"open":"closed"); st.textContent = open ? (naPausa(n.time) ? `Almoço · volta às ${hfmt(STORE.pausa_ate)}` : "Aberto agora") : "Fechado agora";
   // aviso
   $("aviso").hidden = !(STORE.aviso_ativo && STORE.aviso_texto); $("aviso").textContent = STORE.aviso_texto;
   // contatos
